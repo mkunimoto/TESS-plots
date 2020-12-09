@@ -11,6 +11,7 @@ import matplotlib.patheffects as pe
 from astroquery.gaia import Gaia
 from astroquery.mast import Catalogs
 import pickle
+
 import tess_stars2px as trdp
 
 def make_ffi_difference_image(ticData, thisPlanet=None, nPixOnSide = 20, dMagThreshold = 4):
@@ -293,58 +294,45 @@ def make_stellar_scene(pixelData, ticData, ticName, dMagThreshold = 4):
     
     return catalogData
     
-def draw_pix_catalog(pixArray, catalogData, annotate=False, magColorBar=False, pixColorBar=True, pixColorBarLabel=False, drawStars=True, crosshair=True, axisTicks=True, dMagThreshold = 4):
-    if magColorBar:
-        fig = plt.figure(figsize = (15,10));
+def plot_pix_catalog(ax, pixArray, catalogData, close=False, annotate=False, magColorBar=False, pixColorBar=True, pixColorBarLabel=False, filterStars=False, dMagThreshold=4, fs=18, ss=400):
+    if close:
+        ex='extentClose'
+        pixArray=pixArray[7:12,8:13]
     else:
-        fig = plt.figure(figsize = (12,10));
-    plt.imshow(pixArray, cmap='jet', extent=catalogData["extent"])
+        ex='extent'
+    im = ax.imshow(pixArray, cmap='jet', extent=catalogData[ex])
     if pixColorBar:
-        cbh = plt.colorbar()
-        cbh.ax.tick_params(labelsize=18)
+        cbh = plt.colorbar(im, ax=ax)
+        cbh.ax.tick_params(labelsize=fs-2)
     if pixColorBarLabel:
-        cbh.ax.set_ylabel("Pixel Flux [e$^-$/sec]", fontsize = 24);
-    if crosshair:
-        plt.plot([catalogData["extent"][0], catalogData["extent"][1]], [catalogData["targetRowPix"] - catalogData["dRow"],catalogData["targetRowPix"] - catalogData["dRow"]], 'r', alpha = 0.6)
-        plt.plot([catalogData["targetColPix"] - catalogData["dCol"],catalogData["targetColPix"] - catalogData["dCol"]], [catalogData["extent"][2], catalogData["extent"][3]], 'r', alpha = 0.6)
-    plt.plot(catalogData["targetColPix"] - catalogData["dCol"], catalogData["targetRowPix"] - catalogData["dRow"], 'm*', zorder=100)
-    if drawStars:
-        gs = plt.scatter(catalogData["ticColPix"]  - catalogData["dCol"], catalogData["ticRowPix"] - catalogData["dRow"], cmap='BuGn',
-            c=catalogData["ticMag"], s=400*catalogData["ticFluxNorm"], edgeColors="w", linewidths=0.5, alpha=1)
+        cbh.ax.set_ylabel("Pixel Flux [e$^-$/sec]", fontsize=fs-2)
+    if not close:
+        ax.plot([catalogData[ex][0], catalogData[ex][1]], [catalogData["targetRowPix"] - catalogData["dRow"],catalogData["targetRowPix"] - catalogData["dRow"]], 'r', alpha = 0.6)
+        ax.plot([catalogData["targetColPix"] - catalogData["dCol"],catalogData["targetColPix"] - catalogData["dCol"]], [catalogData[ex][2], catalogData[ex][3]], 'r', alpha = 0.6)
+    ax.plot(catalogData["targetColPix"] - catalogData["dCol"], catalogData["targetRowPix"] - catalogData["dRow"], 'm*', zorder=100, ms=fs-2)
+    if ss > 0:
+        targetMag = catalogData["ticMag"][0]
+        if filterStars:
+            idx = (catalogData["ticMag"]-targetMag) < dMagThreshold
+            star_gs = ax.scatter(catalogData["ticColPix"][idx]  - catalogData["dCol"], catalogData["ticRowPix"][idx] - catalogData["dRow"], cmap='BuGn',
+            c=catalogData["ticMag"][idx], s=ss*catalogData["ticFluxNorm"][idx], edgeColors="w", linewidths=0.5, alpha=1)
+        else:
+            star_gs = ax.scatter(catalogData["ticColPix"]  - catalogData["dCol"], catalogData["ticRowPix"] - catalogData["dRow"], cmap='BuGn',
+            c=catalogData["ticMag"], s=ss*catalogData["ticFluxNorm"], edgeColors="w", linewidths=0.5, alpha=1)
         if magColorBar:
-            cbh2 = plt.colorbar(gs)
-            cbh2.ax.set_ylabel("T Mag", fontsize = 24);
-            cbh2.ax.tick_params(labelsize=18)
+            cbh2 = plt.colorbar(star_gs, ax=ax)
+            cbh2.ax.set_ylabel('T mag', fontsize=fs-2)
+            cbh2.ax.tick_params(labelsize=fs-2)
         if annotate:
-            targetMag = catalogData["ticMag"][0]
-            for s in range(len(catalogData["ticID"])):
+            for s in range(len(catalogData['ticID'])):
                 px = catalogData["ticColPix"][s] - catalogData["dCol"]
                 py = catalogData["ticRowPix"][s] - catalogData["dRow"]
                 ticMag = catalogData["ticMag"][s]
-                if ((ticMag-targetMag < dMagThreshold) & (px >= catalogData["extent"][0]) & (px <= catalogData["extent"][1]) & (py > catalogData["extent"][2]) & (py < catalogData["extent"][3])):
-                    plt.text(px, py + 0.2, str(s), color="w", fontsize = 14,
-                    path_effects=[pe.withStroke(linewidth=1,foreground='black')])
-    if not axisTicks:
-        plt.gca().axes.get_xaxis().set_visible(False)
-        plt.gca().axes.get_yaxis().set_visible(False)
-        
-    plt.xlim(catalogData["extent"][0], catalogData["extent"][1])
-    plt.ylim(catalogData["extent"][2], catalogData["extent"][3])
-
-def draw_pix_catalog_close(pixArray, catalogData, pixColorBar=True, drawStars=True, axisTicks=True):
-    fig = plt.figure(figsize = (7,5));
-    plt.imshow(pixArray[7:12,8:13], cmap='jet', extent=catalogData["extentClose"])
-    if pixColorBar:
-        plt.colorbar()
-    plt.plot(catalogData["targetColPix"] - catalogData["dCol"], catalogData["targetRowPix"] - catalogData["dRow"], 'm*', zorder=100)
-    if drawStars:
-        gs = plt.scatter(catalogData["ticColPix"]  - catalogData["dCol"], catalogData["ticRowPix"] - catalogData["dRow"], cmap='BuGn',
-            c=catalogData["ticMag"], s=400*catalogData["ticFluxNorm"], edgeColors="w", linewidths=0.5, alpha=1)
-    if not axisTicks:
-        plt.gca().axes.get_xaxis().set_visible(False)
-        plt.gca().axes.get_yaxis().set_visible(False)
-    plt.xlim(catalogData["extentClose"][0], catalogData["extentClose"][1])
-    plt.ylim(catalogData["extentClose"][2], catalogData["extentClose"][3])
+                if ((ticMag-targetMag < dMagThreshold) & (px >= catalogData[ex][0]) & (px <= catalogData[ex][1]) & (py > catalogData[ex][2]) & (py < catalogData[ex][3])):                
+                    ax.text(px, py + 0.2, str(s), color="w", fontsize = fs-2, path_effects=[pe.withStroke(linewidth=1,foreground='black')])
+    ax.tick_params(axis='both', which='major', labelsize=fs-2)
+    ax.set_xlim(catalogData[ex][0], catalogData[ex][1])
+    ax.set_ylim(catalogData[ex][2], catalogData[ex][3])
 
 def draw_difference_image(diffImageData, pixelData, ticData, planetData, catalogData, ticName, dMagThreshold = 4):
 
@@ -355,31 +343,38 @@ def draw_difference_image(diffImageData, pixelData, ticData, planetData, catalog
         f.write(str(s) + ", " + str(id) + ", " + str(catalogData["ticMag"][s]) + ", " + str(np.round(catalogData["separation"][s], 3)) + "\n")
     f.close()
 
-    draw_pix_catalog(diffImageData["diffImage"], catalogData, dMagThreshold = dMagThreshold)
+    fig, ax = plt.subplots(figsize=(12,10))
+    draw_pix_catalog(ax, diffImageData["diffImage"], catalogData, dMagThreshold = dMagThreshold)
     plt.title("diff image");
     plt.savefig(ticName + "/diffImage_planet" + str(planetData["planetID"]) + "_sector" + str(pixelData["sector"]) + "_camera" + str(pixelData["camera"]) + ".pdf",bbox_inches='tight')
 
-    draw_pix_catalog_close(diffImageData["diffImage"], catalogData)
+    fig, ax = plt.subplots(figsize=(12,10))
+    draw_pix_catalog(ax, diffImageData["diffImage"], catalogData, close=True)
     plt.title("diff image close");
     plt.savefig(ticName + "/diffImageClose_planet" + str(planetData["planetID"]) + "_sector" + str(pixelData["sector"]) + "_camera" + str(pixelData["camera"]) + ".pdf",bbox_inches='tight')
 
-    draw_pix_catalog(diffImageData["diffImageSigma"], catalogData, dMagThreshold = dMagThreshold)
+    fig, ax = plt.subplots(figsize=(12,10))
+    draw_pix_catalog(ax, diffImageData["diffImageSigma"], catalogData, dMagThreshold = dMagThreshold)
     plt.title("SNR diff image");
     plt.savefig(ticName + "/diffImageSNR_planet" + str(planetData["planetID"]) + "_sector" + str(pixelData["sector"]) + "_camera" + str(pixelData["camera"]) + ".pdf",bbox_inches='tight')
 
-    draw_pix_catalog_close(diffImageData["diffImageSigma"], catalogData)
+    fig, ax = plt.subplots(figsize=(12,10))
+    draw_pix_catalog(ax, diffImageData["diffImageSigma"], catalogData, close=True)
     plt.title("SNR diff image close");
     plt.savefig(ticName + "/diffImageSNRClose_planet" + str(planetData["planetID"]) + "_sector" + str(pixelData["sector"]) + "_camera" + str(pixelData["camera"]) + ".pdf",bbox_inches='tight')
     
-    draw_pix_catalog(diffImageData["meanOutTransit"], catalogData, magColorBar=True, dMagThreshold = dMagThreshold)
+    fig, ax = plt.subplots(figsize=(12,10))
+    draw_pix_catalog(ax, diffImageData["meanOutTransit"], catalogData, magColorBar=True, dMagThreshold = dMagThreshold)
     plt.title("Direct image");
     plt.savefig(ticName + "/directImage_planet" + str(planetData["planetID"]) + "_sector" + str(pixelData["sector"]) + "_camera" + str(pixelData["camera"]) + ".pdf",bbox_inches='tight')
 
-    draw_pix_catalog(diffImageData["meanOutTransit"], catalogData, annotate=True, magColorBar=True, dMagThreshold = dMagThreshold)
+    fig, ax = plt.subplots(figsize=(12,10))
+    draw_pix_catalog(ax, diffImageData["meanOutTransit"], catalogData, annotate=True, magColorBar=True, dMagThreshold = dMagThreshold)
     plt.title("Direct image");
     plt.savefig(ticName + "/directImageAnnotated_planet" + str(planetData["planetID"]) + "_sector" + str(pixelData["sector"]) + "_camera" + str(pixelData["camera"]) + ".pdf",bbox_inches='tight')
 
-    draw_pix_catalog_close(diffImageData["meanOutTransit"], catalogData)
+    fig, ax = plt.subplots(figsize=(12,10))
+    draw_pix_catalog(ax, diffImageData["meanOutTransit"], catalogData, close=True)
     plt.title("Direct image close");
     plt.savefig(ticName + "/directImageClose_planet" + str(planetData["planetID"]) + "_sector" + str(pixelData["sector"]) + "_camera" + str(pixelData["camera"]) + ".pdf",bbox_inches='tight')
 
