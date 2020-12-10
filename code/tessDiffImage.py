@@ -228,7 +228,7 @@ def make_stellar_scene(pixelData, ticData, ticName, dMagThreshold = 4):
     dt = (bjd - bjdJ2015p5)/365
     print("dt = " + str(dt) + " years")
 
-    searchRadius = (np.linalg.norm([pixelData["flux"].shape[1], pixelData["flux"].shape[2]]))*27/3600/2 # assumes 27 arcsec pixels
+    searchRadius = (np.linalg.norm([pixelData["flux"].shape[1], pixelData["flux"].shape[2]]))*21/3600/2 # assumes 21 arcsec pixels
     ticCatalog = get_tic(ticData["raDegrees"], ticData["decDegrees"], searchRadius)
 #    print(list(ticCatalog))
     dRa = mas2deg*dt*ticCatalog["pmRA"]/np.cos(ticCatalog["Dec_orig"]*np.pi/180)
@@ -266,8 +266,8 @@ def make_stellar_scene(pixelData, ticData, ticName, dMagThreshold = 4):
             aberrate=True, trySector=pixelData["sector"], scInfo=scinfo)
     theseStars = (outSec == pixelData["sector"]) & (outCam == pixelData["camera"]) & (outCcd == pixelData["ccd"])
 
-    separation = 3600*np.sqrt(np.cos(ticCatalog["correctedDec"][targetIndex]*np.pi/180)**2 * (ticCatalog["ra"] - ticCatalog["correctedRa"][targetIndex])**2
-                                    + (ticCatalog["dec"] - ticCatalog["correctedDec"][targetIndex])**2)
+    separation = 3600*np.sqrt(np.cos(ticCatalog["correctedDec"][targetIndex]*np.pi/180)**2 * (ticCatalog["correctedRa"] - ticCatalog["correctedRa"][targetIndex])**2
+                                    + (ticCatalog["correctedDec"] - ticCatalog["correctedDec"][targetIndex])**2)
 
     catalogData["ticID"] = ticID[theseStars]
     catalogData["ticColPix"] = ticColPix[theseStars]
@@ -294,7 +294,13 @@ def make_stellar_scene(pixelData, ticData, ticName, dMagThreshold = 4):
     
     return catalogData
     
-def plot_pix_catalog(ax, pixArray, catalogData, close=False, annotate=False, magColorBar=False, pixColorBar=True, pixColorBarLabel=False, filterStars=False, dMagThreshold=4, fs=18, ss=400):
+def plot_pix_catalog(pixArray, catalogData, ax=None, close=False, annotate=False, magColorBar=False, pixColorBar=True, pixColorBarLabel=False, filterStars=False, dMagThreshold=4, targetID=None, fs=18, ss=400):
+    if ax == None:
+        ax = plt.gca()
+    if targetID == None:
+        targetIndex = 0
+    else:
+        targetIndex = (ticCatalog["ID"]).astype(int)==targetID)[0]
     if close:
         ex='extentClose'
         pixArray=pixArray[7:12,8:13]
@@ -311,14 +317,13 @@ def plot_pix_catalog(ax, pixArray, catalogData, close=False, annotate=False, mag
         ax.plot([catalogData["targetColPix"] - catalogData["dCol"],catalogData["targetColPix"] - catalogData["dCol"]], [catalogData[ex][2], catalogData[ex][3]], 'r', alpha = 0.6)
     ax.plot(catalogData["targetColPix"] - catalogData["dCol"], catalogData["targetRowPix"] - catalogData["dRow"], 'm*', zorder=100, ms=fs-2)
     if ss > 0:
-        targetMag = catalogData["ticMag"][0]
+        targetMag = catalogData["ticMag"][targetIndex]
         if filterStars:
             idx = (catalogData["ticMag"]-targetMag) < dMagThreshold
-            star_gs = ax.scatter(catalogData["ticColPix"][idx]  - catalogData["dCol"], catalogData["ticRowPix"][idx] - catalogData["dRow"], cmap='BuGn',
-            c=catalogData["ticMag"][idx], s=ss*catalogData["ticFluxNorm"][idx], edgeColors="w", linewidths=0.5, alpha=1)
         else:
-            star_gs = ax.scatter(catalogData["ticColPix"]  - catalogData["dCol"], catalogData["ticRowPix"] - catalogData["dRow"], cmap='BuGn',
-            c=catalogData["ticMag"], s=ss*catalogData["ticFluxNorm"], edgeColors="w", linewidths=0.5, alpha=1)
+            idx = range(len(catalogData))
+        star_gs = ax.scatter(catalogData["ticColPix"][idx]  - catalogData["dCol"], catalogData["ticRowPix"][idx] - catalogData["dRow"], cmap='BuGn',
+            c=catalogData["ticMag"][idx], s=ss*catalogData["ticFluxNorm"][idx], edgeColors="w", linewidths=0.5, alpha=1)
         if magColorBar:
             cbh2 = plt.colorbar(star_gs, ax=ax)
             cbh2.ax.set_ylabel('T mag', fontsize=fs-2)
@@ -344,37 +349,37 @@ def draw_difference_image(diffImageData, pixelData, ticData, planetData, catalog
     f.close()
 
     fig, ax = plt.subplots(figsize=(12,10))
-    draw_pix_catalog(ax, diffImageData["diffImage"], catalogData, dMagThreshold = dMagThreshold)
+    draw_pix_catalog(diffImageData["diffImage"], catalogData, ax=ax, dMagThreshold = dMagThreshold)
     plt.title("diff image");
     plt.savefig(ticName + "/diffImage_planet" + str(planetData["planetID"]) + "_sector" + str(pixelData["sector"]) + "_camera" + str(pixelData["camera"]) + ".pdf",bbox_inches='tight')
 
     fig, ax = plt.subplots(figsize=(12,10))
-    draw_pix_catalog(ax, diffImageData["diffImage"], catalogData, close=True)
+    draw_pix_catalog(diffImageData["diffImage"], catalogData, ax=ax, close=True)
     plt.title("diff image close");
     plt.savefig(ticName + "/diffImageClose_planet" + str(planetData["planetID"]) + "_sector" + str(pixelData["sector"]) + "_camera" + str(pixelData["camera"]) + ".pdf",bbox_inches='tight')
 
     fig, ax = plt.subplots(figsize=(12,10))
-    draw_pix_catalog(ax, diffImageData["diffImageSigma"], catalogData, dMagThreshold = dMagThreshold)
+    draw_pix_catalog(diffImageData["diffImageSigma"], catalogData, ax=ax, dMagThreshold = dMagThreshold)
     plt.title("SNR diff image");
     plt.savefig(ticName + "/diffImageSNR_planet" + str(planetData["planetID"]) + "_sector" + str(pixelData["sector"]) + "_camera" + str(pixelData["camera"]) + ".pdf",bbox_inches='tight')
 
     fig, ax = plt.subplots(figsize=(12,10))
-    draw_pix_catalog(ax, diffImageData["diffImageSigma"], catalogData, close=True)
+    draw_pix_catalog(diffImageData["diffImageSigma"], catalogData, ax=ax, close=True)
     plt.title("SNR diff image close");
     plt.savefig(ticName + "/diffImageSNRClose_planet" + str(planetData["planetID"]) + "_sector" + str(pixelData["sector"]) + "_camera" + str(pixelData["camera"]) + ".pdf",bbox_inches='tight')
     
     fig, ax = plt.subplots(figsize=(12,10))
-    draw_pix_catalog(ax, diffImageData["meanOutTransit"], catalogData, magColorBar=True, dMagThreshold = dMagThreshold)
+    draw_pix_catalog(diffImageData["meanOutTransit"], catalogData, ax=ax, magColorBar=True, dMagThreshold = dMagThreshold)
     plt.title("Direct image");
     plt.savefig(ticName + "/directImage_planet" + str(planetData["planetID"]) + "_sector" + str(pixelData["sector"]) + "_camera" + str(pixelData["camera"]) + ".pdf",bbox_inches='tight')
 
     fig, ax = plt.subplots(figsize=(12,10))
-    draw_pix_catalog(ax, diffImageData["meanOutTransit"], catalogData, annotate=True, magColorBar=True, dMagThreshold = dMagThreshold)
+    draw_pix_catalog(diffImageData["meanOutTransit"], catalogData, ax=ax, annotate=True, magColorBar=True, dMagThreshold = dMagThreshold)
     plt.title("Direct image");
     plt.savefig(ticName + "/directImageAnnotated_planet" + str(planetData["planetID"]) + "_sector" + str(pixelData["sector"]) + "_camera" + str(pixelData["camera"]) + ".pdf",bbox_inches='tight')
 
     fig, ax = plt.subplots(figsize=(12,10))
-    draw_pix_catalog(ax, diffImageData["meanOutTransit"], catalogData, close=True)
+    draw_pix_catalog(diffImageData["meanOutTransit"], catalogData, ax=ax, close=True)
     plt.title("Direct image close");
     plt.savefig(ticName + "/directImageClose_planet" + str(planetData["planetID"]) + "_sector" + str(pixelData["sector"]) + "_camera" + str(pixelData["camera"]) + ".pdf",bbox_inches='tight')
 
