@@ -294,7 +294,7 @@ def make_stellar_scene(pixelData, ticData, ticName, dMagThreshold = 4):
     
     return catalogData
     
-def plot_pix_catalog(pixArray, catalogData, ax=None, close=False, annotate=False, magColorBar=False, pixColorBar=True, pixColorBarLabel=False, filterStars=False, dMagThreshold=4, targetID=None, fs=18, ss=400):
+def draw_pix_catalog(pixArray, catalogData, ax=None, close=False, annotate=False, magColorBar=False, pixColorBar=True, pixColorBarLabel=False, filterStars=False, dMagThreshold=4, targetID=None, fs=18, ss=400):
     if ax == None:
         ax = plt.gca()
     if targetID == None:
