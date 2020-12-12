@@ -114,12 +114,12 @@ def get_cadence_data(fitsFile):
 
     # read important keywords
     # the reference pixel coordinates are the low corner of the central pixel
-    pixelData["referenceRow"] = binHeader["1CRPX4"] # reference pixel along axis 1
-    pixelData["referenceCol"] = binHeader["2CRPX4"] # reference pixel along axis 1
+    pixelData["referenceCol"] = binHeader["1CRPX4"] # reference pixel along axis 1
+    pixelData["referenceRow"] = binHeader["2CRPX4"] # reference pixel along axis 1
     pixelData["referenceRa"] = binHeader["1CRVL4"] # reference pixel ra in degrees
     pixelData["referenceDec"] = binHeader["2CRVL4"] # reference pixel dec in degrees
-    pixelData["cornerRow"] = binHeader["1CRV4P"] # reference pixel ra in degrees
-    pixelData["cornerCol"] = binHeader["2CRV4P"] # reference pixel dec in degrees
+    pixelData["cornerCol"] = binHeader["1CRV4P"] # reference pixel ra in degrees
+    pixelData["cornerRow"] = binHeader["2CRV4P"] # reference pixel dec in degrees
     pixelData["sector"] = priHeader["SECTOR"] # reference pixel dec in degrees
     pixelData["camera"] = priHeader["CAMERA"] # reference pixel dec in degrees
     pixelData["ccd"] = priHeader["CCD"] # reference pixel dec in degrees
@@ -280,8 +280,8 @@ def make_stellar_scene(pixelData, ticData, ticName, dMagThreshold = 4):
 
 #    extent = (pixelData["cornerCol"], pixelData["cornerCol"] + 20, pixelData["cornerRow"], pixelData["cornerRow"] + 20)
 #    extent = (pixelData["cornerRow"]-0.5, pixelData["cornerRow"]-0.5 + 20, pixelData["cornerCol"]-0.5, pixelData["cornerCol"]-0.5 + 20)
-    catalogData["extent"] = (pixelData["cornerRow"], pixelData["cornerRow"] + pixelData["flux"].shape[1],
-        pixelData["cornerCol"], pixelData["cornerCol"] + pixelData["flux"].shape[2])
+    catalogData["extent"] = (pixelData["cornerCol"], pixelData["cornerCol"] + pixelData["flux"].shape[1],
+        pixelData["cornerRow"], pixelData["cornerRow"] + pixelData["flux"].shape[2])
 #    print(pixelData["flux"].shape)
 #    print(catalogData["extent"])
     catalogData["dRow"] = catalogData["refRowPix"] - (pixelData["referenceRow"] + catalogData["extent"][2] - 0.5)
@@ -289,8 +289,8 @@ def make_stellar_scene(pixelData, ticData, ticName, dMagThreshold = 4):
 
     closeupOffset = 8
     closeupSize = 5
-    catalogData["extentClose"] = (pixelData["cornerRow"] + 8, pixelData["cornerRow"] + 8 + closeupSize,
-        pixelData["cornerCol"] + 8, pixelData["cornerCol"]  + 8 + closeupSize)
+    catalogData["extentClose"] = (pixelData["cornerCol"] + 8, pixelData["cornerCol"] + 8 + closeupSize,
+        pixelData["cornerRow"] + 8, pixelData["cornerRow"]  + 8 + closeupSize)
     
     return catalogData
     
