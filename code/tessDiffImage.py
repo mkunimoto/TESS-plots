@@ -20,7 +20,7 @@ def make_ffi_difference_image(ticData, thisPlanet=None, nPixOnSide = 20, dMagThr
     for fitsFile in fitsList:
         pixelData = get_cadence_data(fitsFile)
         # check that this is the camera and sector that we want here
-        if (ticData["camera"] != None) & ((ticData["sector"] != pixelData["sector"]) | (ticData["camera"] != pixelData["camera"])):
+        if (ticData["cam"] != None) & ((ticData["sector"] != pixelData["sector"]) | (ticData["cam"] != pixelData["camera"])):
             continue
 
         sectorQflags = np.array([])
@@ -81,7 +81,7 @@ def make_planet_difference_image(ticData, planetData, pixelData, catalogData, ti
     draw_lc_transits(pixelData, planetData, inTransitIndices, outTransitIndices, transitIndex, ticName)
 
     f = open(ticName + "/imageData_planet" + str(planetData["planetID"]) + "_sector" + str(pixelData["sector"]) + "_camera" + str(pixelData["camera"]) + ".pickle", 'wb')
-    pickle.dump([diffImageData, catalogData], f, pickle.HIGHEST_PROTOCOL)
+    pickle.dump([diffImageData, catalogData, pixelData, inTransitIndices, outTransitIndices, transitIndex], f, pickle.HIGHEST_PROTOCOL)
     f.close()
 
 
@@ -178,8 +178,8 @@ def find_transits(pixelData, planetData):
             | (np.abs((pixelData["time"][i] + outTransitBuffer) - pixelData["time"]) < transitAverageDurationDays)
             & (pixelData["quality"] == 0) & (pixelData["inOtherTransit"] == 0))
             
-#        print([len(thisTransitInIndices), np.floor(planetData["durationHours"]/(24*dt))-2*nBufferCadences])
-#        print([len(thisTransitOutIndices), 2*(np.floor(planetData["durationHours"]/(24*dt))-2*nBufferCadences)])
+#        print([len(thisTransitInIndices), np.floor(np.floor(planetData["durationHours"]/(24*dt))-2])
+#        print([len(thisTransitOutIndices), 2*(np.floor(planetData["durationHours"]/(24*dt))-2)])
         if (len(thisTransitInIndices) < np.floor(planetData["durationHours"]/(24*dt))-2) \
             | (len(thisTransitOutIndices) < 2*(np.floor(planetData["durationHours"]/(24*dt))-2)):
             continue
@@ -300,7 +300,7 @@ def draw_pix_catalog(pixArray, catalogData, ax=None, close=False, annotate=False
     if targetID == None:
         targetIndex = 0
     else:
-        targetIndex = (ticCatalog["ID"]).astype(int)==targetID)[0]
+        targetIndex = ((ticCatalog["ID"]).astype(int)==targetID)[0]
     if close:
         ex='extentClose'
         pixArray=pixArray[7:12,8:13]
@@ -339,7 +339,7 @@ def draw_pix_catalog(pixArray, catalogData, ax=None, close=False, annotate=False
     ax.set_xlim(catalogData[ex][0], catalogData[ex][1])
     ax.set_ylim(catalogData[ex][2], catalogData[ex][3])
 
-def draw_difference_image(diffImageData, pixelData, ticData, planetData, catalogData, ticName, dMagThreshold = 4):
+def draw_difference_image(diffImageData, pixelData, ticData, planetData, catalogData, ticName = None, dMagThreshold = 4):
 
     f = open(ticName + "/ticKey_planet" + str(planetData["planetID"]) + "_sector" + str(pixelData["sector"]) + "_camera" + str(pixelData["camera"]) + ".txt", 'w')
     f.write("# index, TIC ID, TMag, separation (arcsec)\n")
@@ -396,7 +396,8 @@ def draw_lc_transits(pixelData, planetData, inTransitIndices, outTransitIndices,
     plt.legend()
     plt.xlabel("time");
     plt.ylabel("flux (e-/sec)");
-    plt.savefig(ticName + "/lcTransits_planet" + str(planetData["planetID"]) + "_sector" + str(pixelData["sector"]) + "_camera" + str(pixelData["camera"]) + ".pdf",bbox_inches='tight')
+    if ticName != None:
+        plt.savefig(ticName + "/lcTransits_planet" + str(planetData["planetID"]) + "_sector" + str(pixelData["sector"]) + "_camera" + str(pixelData["camera"]) + ".pdf",bbox_inches='tight')
 
 def get_tic(ra, dec, radiusDegrees):
     return Catalogs.query_region(str(ra) + " " + str(dec), radius=radiusDegrees, catalog="TIC")
