@@ -14,7 +14,7 @@ import pickle
 
 import tess_stars2px as trdp
 
-def make_ffi_difference_image(ticData, thisPlanet=None, nPixOnSide = 20, dMagThreshold = 4):
+def make_ffi_difference_image(ticData, thisPlanet=None, nPixOnSide = 20, dMagThreshold = 4, allowedBadCadences = 0):
     fitsList = get_tess_cut(ticData["id"], ticData["raDegrees"], ticData["decDegrees"], ticData["sector"], nPixOnSide = nPixOnSide)
     ticName = "tic" + str(ticData["id"])
     for fitsFile in fitsList:
@@ -45,17 +45,17 @@ def make_ffi_difference_image(ticData, thisPlanet=None, nPixOnSide = 20, dMagThr
             for p, planetData in enumerate(ticData["planetData"]):
                 planetData["planetIndex"] = p
                 planetData["planetID"] = p
-                make_planet_difference_image(ticData, planetData, pixelData, catalogData, ticName, dMagThreshold)
+                make_planet_difference_image(ticData, planetData, pixelData, catalogData, ticName, dMagThreshold, allowedBadCadences = allowedBadCadences)
         else:
             planetData = ticData["planetData"][thisPlanet]
             planetData["planetIndex"] = thisPlanet
             planetData["planetID"] = thisPlanet
-            make_planet_difference_image(ticData, planetData, pixelData, catalogData, ticName, dMagThreshold)
+            make_planet_difference_image(ticData, planetData, pixelData, catalogData, ticName, dMagThreshold, allowedBadCadences = allowedBadCadences)
 
     #       print('rm ' + ticName + '/*.fits')
     os.system('rm ' + ticName + '/*.fits')
 
-def make_planet_difference_image(ticData, planetData, pixelData, catalogData, ticName, dMagThreshold = 4):
+def make_planet_difference_image(ticData, planetData, pixelData, catalogData, ticName, dMagThreshold = 4, allowedBadCadences = 0):
     # for each planet, make an array of cadences that are in the transits of other planets
     inOtherTransitIndices = [];
     for pi, otherPlanet in enumerate(ticData["planetData"]):
@@ -75,7 +75,7 @@ def make_planet_difference_image(ticData, planetData, pixelData, catalogData, ti
     pixelData["inOtherTransit"] = np.zeros(pixelData["quality"].shape)
     pixelData["inOtherTransit"][inOtherTransitIndices] = 1
 
-    inTransitIndices, outTransitIndices, transitIndex = find_transits(pixelData, planetData)
+    inTransitIndices, outTransitIndices, transitIndex = find_transits(pixelData, planetData, allowedBadCadences = allowedBadCadences)
     diffImageData = make_difference_image(pixelData, inTransitIndices, outTransitIndices)
     draw_difference_image(diffImageData, pixelData, ticData, planetData, catalogData, ticName, dMagThreshold)
     draw_lc_transits(pixelData, planetData, inTransitIndices, outTransitIndices, transitIndex, ticName)
@@ -134,7 +134,7 @@ def get_cadence_data(fitsFile):
         pixelData["fluxErr"][i,:,:] = cadenceData[i][5]
         pixelData["quality"][i] = cadenceData[i][8]
         
-    print("time: " + str([np.min(pixelData["time"]), np.max(pixelData["time"])]))
+#    print("time: " + str([np.min(pixelData["time"]), np.max(pixelData["time"])]))
     return pixelData
     
 def find_transit_times(pixelData, planetData):
@@ -155,37 +155,43 @@ def find_transit_times(pixelData, planetData):
     return transitTimes, transitIndex
 
 
-def find_transits(pixelData, planetData):
+def find_transits(pixelData, planetData, allowedBadCadences = 0):
     transitTimes, transitIndex = find_transit_times(pixelData, planetData)
-  
+      
     durationDays = planetData["durationHours"]/24;
     transitAverageDurationDays = 0.9*durationDays/2;
     inTransitIndices = [];
     outTransitIndices = [];
     # Center of the out transit is n cadences + half the duration + half the duration away from the center of the transit
     dt = pixelData["time"][1] - pixelData["time"][0] # days
-    outTransitBuffer = 2*dt + durationDays/2
+    outTransitBuffer = dt + durationDays
+#    print("allowedBadCadences = " + str(allowedBadCadences))
+#    print("durationDays = " + str(durationDays))
 #    print("outTransitBuffer = " + str(outTransitBuffer))
 #    print("transitAverageDurationDays = " + str(transitAverageDurationDays))
+    expectedInTransitLength = np.floor(2*transitAverageDurationDays/dt)
+#    print("expected number in transit = ", str(expectedInTransitLength))
     for i in transitIndex:
         thisTransitInIndices = np.argwhere(
-            (np.abs(pixelData["time"][i] - pixelData["time"]) < transitAverageDurationDays)
-            & (pixelData["quality"] == 0) & (pixelData["inOtherTransit"] == 0))
-    # we expect durationHours*2 - 2 transit indices per transit.  If we see less, reject the transit
+            (np.abs(pixelData["time"][i] - pixelData["time"]) < transitAverageDurationDays))
     
         thisTransitOutIndices = np.argwhere(
             (np.abs((pixelData["time"][i] - outTransitBuffer) - pixelData["time"]) < transitAverageDurationDays)
-            | (np.abs((pixelData["time"][i] + outTransitBuffer) - pixelData["time"]) < transitAverageDurationDays)
-            & (pixelData["quality"] == 0) & (pixelData["inOtherTransit"] == 0))
+            | (np.abs((pixelData["time"][i] + outTransitBuffer) - pixelData["time"]) < transitAverageDurationDays))
             
-#        print([len(thisTransitInIndices), np.floor(np.floor(planetData["durationHours"]/(24*dt))-2])
-#        print([len(thisTransitOutIndices), 2*(np.floor(planetData["durationHours"]/(24*dt))-2)])
-        if (len(thisTransitInIndices) < np.floor(planetData["durationHours"]/(24*dt))-2) \
-            | (len(thisTransitOutIndices) < 2*(np.floor(planetData["durationHours"]/(24*dt))-2)):
+#        print(sum(pixelData["quality"][thisTransitInIndices] > 0) + sum(pixelData["quality"][thisTransitOutIndices] > 0))
+        if (len(thisTransitInIndices) < expectedInTransitLength) | (len(thisTransitOutIndices) < 2*expectedInTransitLength) | (sum(pixelData["quality"][thisTransitInIndices] > 0) + sum(pixelData["quality"][thisTransitOutIndices] > 0) > allowedBadCadences):
             continue
-        
-        inTransitIndices = np.append(inTransitIndices, thisTransitInIndices)
-        outTransitIndices = np.append(outTransitIndices, thisTransitOutIndices)
+#        print("transit " + str(i) + ":")
+#        print([len(thisTransitInIndices), expectedInTransitLength])
+#        print([len(thisTransitOutIndices), 2*expectedInTransitLength])
+#        if np.any(pixelData["quality"][thisTransitInIndices] > 0):
+#            print("in transit bad quality flags: " + str(pixelData["quality"][thisTransitInIndices]))
+#        if np.any(pixelData["quality"][thisTransitOutIndices] > 0):
+#            print("out transit bad quality flags: " + str(pixelData["quality"][thisTransitOutIndices]))
+
+        inTransitIndices = np.append(inTransitIndices, thisTransitInIndices[pixelData["quality"][thisTransitInIndices] == 0])
+        outTransitIndices = np.append(outTransitIndices, thisTransitOutIndices[pixelData["quality"][thisTransitOutIndices] == 0])
 
     inTransitIndices = np.array(inTransitIndices).astype(int)
     outTransitIndices = np.array(outTransitIndices).astype(int)
@@ -226,7 +232,7 @@ def make_stellar_scene(pixelData, ticData, ticName, dMagThreshold = 4):
     bjd = np.mean(pixelData["time"])
     mas2deg = 1/(3600*1000)
     dt = (bjd - bjdJ2015p5)/365
-    print("dt = " + str(dt) + " years")
+#    print("dt = " + str(dt) + " years")
 
     searchRadius = (np.linalg.norm([pixelData["flux"].shape[1], pixelData["flux"].shape[2]]))*21/3600/2 # assumes 21 arcsec pixels
     ticCatalog = get_tic(ticData["raDegrees"], ticData["decDegrees"], searchRadius)
@@ -235,8 +241,8 @@ def make_stellar_scene(pixelData, ticData, ticName, dMagThreshold = 4):
     dRa[np.isnan(dRa)] = 0
     dDec = mas2deg*dt*ticCatalog["pmDEC"]
     dDec[np.isnan(dDec)] = 0
-    print("mean dRa in arcsec = " + str(3600*np.mean(dRa)))
-    print("mean dDec in arcsec = " + str(3600*np.mean(dDec)))
+#    print("mean dRa in arcsec = " + str(3600*np.mean(dRa)))
+#    print("mean dDec in arcsec = " + str(3600*np.mean(dDec)))
     ticCatalog["correctedRa"] = ticCatalog["RA_orig"] + dRa
     ticCatalog["correctedDec"] =  ticCatalog["Dec_orig"] + dDec
 
@@ -383,8 +389,9 @@ def draw_difference_image(diffImageData, pixelData, ticData, planetData, catalog
     plt.title("Direct image close");
     plt.savefig(ticName + "/directImageClose_planet" + str(planetData["planetID"]) + "_sector" + str(pixelData["sector"]) + "_camera" + str(pixelData["camera"]) + ".pdf",bbox_inches='tight')
 
-def draw_lc_transits(pixelData, planetData, inTransitIndices, outTransitIndices, transitIndex, ticName):
-    apFlux = pixelData["flux"][:,8:13,8:13]
+def draw_lc_transits(pixelData, planetData, inTransitIndices, outTransitIndices, transitIndex, ticName = None, apCenter = [10,10]):
+#    apFlux = pixelData["flux"][:,8:13,8:13]
+    apFlux = pixelData["flux"][:,apCenter[0]-2:apCenter[0]+3,apCenter[1]-2:apCenter[1]+3]
     lc = np.sum(np.sum(apFlux,2),1)
     plt.figure(figsize=(15, 5));
     plt.plot(pixelData["time"][pixelData["quality"]==0], lc[pixelData["quality"]==0], label="flux")
