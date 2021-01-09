@@ -14,7 +14,7 @@ import pickle
 
 import tess_stars2px as trdp
 
-def make_ffi_difference_image(ticData, thisPlanet=None, nPixOnSide = 20, dMagThreshold = 4, allowedBadCadences = 0):
+def make_ffi_difference_image(ticData, thisPlanet=None, nPixOnSide = 20, dMagThreshold = 4, allowedBadCadences = 2):
     fitsList = get_tess_cut(ticData["id"], ticData["raDegrees"], ticData["decDegrees"], ticData["sector"], nPixOnSide = nPixOnSide)
     ticName = "tic" + str(ticData["id"])
     for fitsFile in fitsList:
