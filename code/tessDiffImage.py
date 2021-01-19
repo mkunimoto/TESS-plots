@@ -335,12 +335,14 @@ def draw_pix_catalog(pixArray, catalogData, ax=None, close=False, annotate=False
             cbh2.ax.set_ylabel('T mag', fontsize=fs-2)
             cbh2.ax.tick_params(labelsize=fs-2)
         if annotate:
+            bbox = ax.get_window_extent().transformed(plt.gcf().dpi_scale_trans.inverted())
+            pscale = bbox.width * plt.gcf().dpi
             for s in range(len(catalogData['ticID'])):
                 px = catalogData["ticColPix"][s] - catalogData["dCol"]
                 py = catalogData["ticRowPix"][s] - catalogData["dRow"]
                 ticMag = catalogData["ticMag"][s]
-                if ((ticMag-targetMag < dMagThreshold) & (px >= catalogData[ex][0]) & (px <= catalogData[ex][1]) & (py > catalogData[ex][2]) & (py < catalogData[ex][3])):                
-                    ax.text(px, py + 0.2, str(s), color="w", fontsize = fs-2, path_effects=[pe.withStroke(linewidth=1,foreground='black')])
+                if ((ticMag-targetMag < dMagThreshold) & (px >= catalogData[ex][0]) & (px <= catalogData[ex][1]) & (py > catalogData[ex][2]) & (py < catalogData[ex][3])):
+                    ax.text(px, py + 1*20/pscale, str(s), color="w", fontsize = fs-2, path_effects=[pe.withStroke(linewidth=1,foreground='black')])
     ax.tick_params(axis='both', which='major', labelsize=fs-2)
     ax.set_xlim(catalogData[ex][0], catalogData[ex][1])
     ax.set_ylim(catalogData[ex][2], catalogData[ex][3])
