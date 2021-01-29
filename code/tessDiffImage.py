@@ -155,7 +155,7 @@ def find_transit_times(pixelData, planetData):
         ii = np.abs(pixelData["time"] - t).argmin()
         if np.abs(pixelData["time"][ii] - t) > bufferRatio*dt:
             print("got large cadence difference: " + str(pixelData["time"][ii] - t))
-        if np.abs(pixelData["time"][ii] - t) < bufferRatio*dt: # 0.5 so we don't pick up one cadence over
+        if np.abs(pixelData["time"][ii] - t) < bufferRatio*dt: # so we don't pick up one cadence over
             transitIndex = np.append(transitIndex, np.abs(pixelData["time"] - t).argmin())
     transitIndex = transitIndex.astype(int)
     
