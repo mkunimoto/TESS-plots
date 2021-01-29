@@ -140,8 +140,7 @@ def get_cadence_data(fitsFile):
 def find_transit_times(pixelData, planetData):
 
     transitTimes = [];
-    # dt = pixelData["time"][1] - pixelData["time"][0] # days
-    dt = np.min(np.diff(pixelData["time"]))
+    dt = np.min(np.diff(pixelData["time"])) # days
     firstTransitTime = np.ceil((pixelData["time"][0] - planetData["epoch"])/planetData["period"])*planetData["period"] + planetData["epoch"]
     n = np.ceil((pixelData["time"][0] - planetData["epoch"])/planetData["period"]);
     while planetData["epoch"] + n*planetData["period"] < pixelData["time"][-1]:
@@ -153,9 +152,9 @@ def find_transit_times(pixelData, planetData):
     for t in transitTimes:
         # don't get tripped up by transits in gaps
         ii = np.abs(pixelData["time"] - t).argmin()
-        if np.abs(pixelData["time"][ii] - t) > bufferRatio*dt:
-            print("got large cadence difference: " + str(pixelData["time"][ii] - t))
         if np.abs(pixelData["time"][ii] - t) < bufferRatio*dt: # so we don't pick up one cadence over
+            if np.abs(pixelData["time"][ii] - t) > bufferRatio*dt:
+                print("got large cadence difference: " + str(pixelData["time"][ii] - t))
             transitIndex = np.append(transitIndex, np.abs(pixelData["time"] - t).argmin())
     transitIndex = transitIndex.astype(int)
     
@@ -170,7 +169,7 @@ def find_transits(pixelData, planetData, allowedBadCadences = 0):
     inTransitIndices = [];
     outTransitIndices = [];
     # Center of the out transit is n cadences + half the duration + half the duration away from the center of the transit
-    dt = pixelData["time"][1] - pixelData["time"][0] # days
+    dt = np.min(np.diff(pixelData["time"])) # days
     outTransitBuffer = dt + durationDays
 #    print("allowedBadCadences = " + str(allowedBadCadences))
 #    print("durationDays = " + str(durationDays))
