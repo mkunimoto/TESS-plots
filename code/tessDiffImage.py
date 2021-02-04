@@ -138,37 +138,21 @@ def get_cadence_data(fitsFile):
     return pixelData
     
 def find_transit_times(pixelData, planetData):
-
-    transitTimes = [];
-    dt = np.min(np.diff(pixelData["time"])) # days
-    firstTransitTime = np.ceil((pixelData["time"][0] - planetData["epoch"])/planetData["period"])*planetData["period"] + planetData["epoch"]
-    n = np.ceil((pixelData["time"][0] - planetData["epoch"])/planetData["period"]);
-    while planetData["epoch"] + n*planetData["period"] < pixelData["time"][-1]:
-      transitTimes = np.append(transitTimes, planetData["epoch"] + n*planetData["period"])
-      n = n+1;
-
-    transitIndex = [];
+    nTransit = np.round((pixelData["time"] - planetData["epoch"])/planetData["period"]).astype(int)
+    transitTimes = np.unique(planetData["epoch"] + planetData["period"] * nTransit)
+    transitIndex = np.array([np.abs(pixelData["time"] - t).argmin() for t in transitTimes])
     bufferRatio = 0.5
-    for t in transitTimes:
-        # don't get tripped up by transits in gaps
-        ii = np.abs(pixelData["time"] - t).argmin()
-        if np.abs(pixelData["time"][ii] - t) < bufferRatio*dt: # so we don't pick up one cadence over
-            if np.abs(pixelData["time"][ii] - t) > bufferRatio*dt:
-                print("got large cadence difference: " + str(pixelData["time"][ii] - t))
-            transitIndex = np.append(transitIndex, np.abs(pixelData["time"] - t).argmin())
-    transitIndex = transitIndex.astype(int)
-    
+    flagGaps = np.abs(pixelData["time"][transitIndex] - transitTimes) > bufferRatio*dt
+    for i in np.nonzero(flagGaps)[0]:
+        print("large cadence difference: " + str(pixelData["time"][transitIndex][i] - transitTimes[i]))
     return transitTimes, transitIndex
-
 
 def find_transits(pixelData, planetData, allowedBadCadences = 0):
     transitTimes, transitIndex = find_transit_times(pixelData, planetData)
       
     durationDays = planetData["durationHours"]/24;
     transitAverageDurationDays = 0.9*durationDays/2;
-    inTransitIndices = [];
-    outTransitIndices = [];
-    # Center of the out transit is n cadences + half the duration + half the duration away from the center of the transit
+    # Center of the out transit is n cadences + one duration away from the center of the transit
     dt = np.min(np.diff(pixelData["time"])) # days
     outTransitBuffer = dt + durationDays
 #    print("allowedBadCadences = " + str(allowedBadCadences))
@@ -177,16 +161,18 @@ def find_transits(pixelData, planetData, allowedBadCadences = 0):
 #    print("transitAverageDurationDays = " + str(transitAverageDurationDays))
     expectedInTransitLength = np.floor(2*transitAverageDurationDays/dt)
 #    print("expected number in transit = ", str(expectedInTransitLength))
+    inTransitIndices = []
+    outTransitIndices = []
+    badCadences = []
     for i in transitIndex:
-        thisTransitInIndices = np.argwhere(
-            (np.abs(pixelData["time"][i] - pixelData["time"]) < transitAverageDurationDays))
-    
-        thisTransitOutIndices = np.argwhere(
-            (np.abs((pixelData["time"][i] - outTransitBuffer) - pixelData["time"]) < transitAverageDurationDays)
-            | (np.abs((pixelData["time"][i] + outTransitBuffer) - pixelData["time"]) < transitAverageDurationDays))
-            
+        thisTransitInIndices = np.nonzero(
+            (np.abs(pixelData["time"][i] - pixelData["time"]) < transitAverageDurationDays))[0]
+        thisTransitOutIndices = np.nonzero(
+            (np.abs(pixelData["time"][i] - pixelData["time"]) > (outTransitBuffer - transitAverageDurationDays))
+            & (np.abs(pixelData["time"][i] - pixelData["time"]) < (outTransitBuffer + transitAverageDurationDays)))[0]
+        thisTransitBadCadences = np.sum(pixelData["quality"][thisTransitInIndices] != 0) + np.sum(pixelData["quality"][thisTransitOutIndices] != 0)
 #        print(sum(pixelData["quality"][thisTransitInIndices] > 0) + sum(pixelData["quality"][thisTransitOutIndices] > 0))
-        if (len(thisTransitInIndices) < expectedInTransitLength) | (len(thisTransitOutIndices) < 2*expectedInTransitLength) | (sum(pixelData["quality"][thisTransitInIndices] > 0) + sum(pixelData["quality"][thisTransitOutIndices] > 0) > allowedBadCadences):
+        if (len(thisTransitInIndices) < expectedInTransitLength) | (len(thisTransitOutIndices) < 2*expectedInTransitLength):
             continue
 #        print("transit " + str(i) + ":")
 #        print([len(thisTransitInIndices), expectedInTransitLength])
@@ -196,11 +182,13 @@ def find_transits(pixelData, planetData, allowedBadCadences = 0):
 #        if np.any(pixelData["quality"][thisTransitOutIndices] > 0):
 #            print("out transit bad quality flags: " + str(pixelData["quality"][thisTransitOutIndices]))
 
-        inTransitIndices = np.append(inTransitIndices, thisTransitInIndices[pixelData["quality"][thisTransitInIndices] == 0])
-        outTransitIndices = np.append(outTransitIndices, thisTransitOutIndices[pixelData["quality"][thisTransitOutIndices] == 0])
+        inTransitIndices.append(thisTransitInIndices[pixelData["quality"][thisTransitInIndices] == 0].tolist())
+        outTransitIndices.append(thisTransitOutIndices[pixelData["quality"][thisTransitOutIndices] == 0].tolist())
+        nBadCadences.append(thisTransitBadCadences)
 
-    inTransitIndices = np.array(inTransitIndices).astype(int)
-    outTransitIndices = np.array(outTransitIndices).astype(int)
+    goodTransits = (nBadCadences <= np.max([allowedBadCadences, np.min(nBadCadences)]))
+    inTransitIndices = np.unique(sum(np.array(inTransitIndices)[goodTransits], []))
+    outTransitIndices = np.unique(sum(np.array(outTransitIndices)[goodTransits], []))
 
     return inTransitIndices, outTransitIndices, transitIndex
 
