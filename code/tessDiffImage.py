@@ -333,7 +333,7 @@ def draw_pix_catalog(pixArray, catalogData, ax=None, close=False, annotate=False
         if filterStars:
             idx = (catalogData["ticMag"]-targetMag) < dMagThreshold
         else:
-            idx = range(len(catalogData))
+            idx = range(len(catalogData['ticID']))
         star_gs = ax.scatter(catalogData["ticColPix"][idx]  - catalogData["dCol"], catalogData["ticRowPix"][idx] - catalogData["dRow"], cmap='BuGn',
             c=catalogData["ticMag"][idx], s=ss*catalogData["ticFluxNorm"][idx], edgeColors="w", linewidths=0.5, alpha=1)
         if magColorBar:
