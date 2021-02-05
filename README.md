@@ -29,3 +29,5 @@ Requirements:
 - numpy
 - scipy
 
+## TODO:
+- some sections of code assume a 20x20 pixel cutout; make this more general 
