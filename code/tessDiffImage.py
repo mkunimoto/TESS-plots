@@ -187,8 +187,8 @@ def find_transits(pixelData, planetData, allowedBadCadences = 0):
         nBadCadences.append(thisTransitBadCadences)
 
     goodTransits = (nBadCadences <= np.max([allowedBadCadences, np.min(nBadCadences)]))
-    inTransitIndices = np.unique(sum(np.array(inTransitIndices)[goodTransits], []))
-    outTransitIndices = np.unique(sum(np.array(outTransitIndices)[goodTransits], []))
+    inTransitIndices = np.unique(sum(np.array(inTransitIndices)[goodTransits].tolist(), []))
+    outTransitIndices = np.unique(sum(np.array(outTransitIndices)[goodTransits].tolist(), []))
 
     return inTransitIndices, outTransitIndices, transitIndex
 
