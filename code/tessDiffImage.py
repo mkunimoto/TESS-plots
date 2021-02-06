@@ -138,6 +138,7 @@ def get_cadence_data(fitsFile):
     return pixelData
     
 def find_transit_times(pixelData, planetData):
+    dt = np.min(np.diff(pixelData["time"]))
     nTransit = np.round((pixelData["time"] - planetData["epoch"])/planetData["period"]).astype(int)
     transitTimes = np.unique(planetData["epoch"] + planetData["period"] * nTransit)
     transitIndex = np.array([np.abs(pixelData["time"] - t).argmin() for t in transitTimes])
