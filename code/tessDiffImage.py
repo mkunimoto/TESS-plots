@@ -81,7 +81,7 @@ def make_planet_difference_image(ticData, planetData, pixelData, catalogData, ti
     draw_lc_transits(pixelData, planetData, inTransitIndices, outTransitIndices, transitIndex, ticName)
 
     f = open(ticName + "/imageData_planet" + str(planetData["planetID"]) + "_sector" + str(pixelData["sector"]) + "_camera" + str(pixelData["camera"]) + ".pickle", 'wb')
-    pickle.dump([diffImageData, catalogData, pixelData, inTransitIndices, outTransitIndices, transitIndex], f, pickle.HIGHEST_PROTOCOL)
+    pickle.dump([diffImageData, catalogData, pixelData, inTransitIndices, outTransitIndices, transitIndex, planetData], f, pickle.HIGHEST_PROTOCOL)
     f.close()
 
 
@@ -138,37 +138,24 @@ def get_cadence_data(fitsFile):
     return pixelData
     
 def find_transit_times(pixelData, planetData):
-
-    transitTimes = [];
-    dt = np.min(np.diff(pixelData["time"])) # days
-    firstTransitTime = np.ceil((pixelData["time"][0] - planetData["epoch"])/planetData["period"])*planetData["period"] + planetData["epoch"]
-    n = np.ceil((pixelData["time"][0] - planetData["epoch"])/planetData["period"]);
-    while planetData["epoch"] + n*planetData["period"] < pixelData["time"][-1]:
-      transitTimes = np.append(transitTimes, planetData["epoch"] + n*planetData["period"])
-      n = n+1;
-
-    transitIndex = [];
+    dt = np.min(np.diff(pixelData["time"]))
+    nTransit = np.round((pixelData["time"] - planetData["epoch"])/planetData["period"]).astype(int)
+    transitTimes = np.unique(planetData["epoch"] + planetData["period"] * nTransit)
+    transitIndex = np.array([np.abs(pixelData["time"] - t).argmin() for t in transitTimes])
     bufferRatio = 0.5
-    for t in transitTimes:
-        # don't get tripped up by transits in gaps
-        ii = np.abs(pixelData["time"] - t).argmin()
-        if np.abs(pixelData["time"][ii] - t) < bufferRatio*dt: # so we don't pick up one cadence over
-            if np.abs(pixelData["time"][ii] - t) > bufferRatio*dt:
-                print("got large cadence difference: " + str(pixelData["time"][ii] - t))
-            transitIndex = np.append(transitIndex, np.abs(pixelData["time"] - t).argmin())
-    transitIndex = transitIndex.astype(int)
-    
+    flagGaps = np.abs(pixelData["time"][transitIndex] - transitTimes) > bufferRatio*dt
+    for i in np.nonzero(flagGaps)[0]:
+        print("large cadence difference: " + str(pixelData["time"][transitIndex][i] - transitTimes[i]))
+    transitTimes = transitTimes[~flagGaps]
+    transitIndex = transitIndex[~flagGaps]
     return transitTimes, transitIndex
-
 
 def find_transits(pixelData, planetData, allowedBadCadences = 0):
     transitTimes, transitIndex = find_transit_times(pixelData, planetData)
       
     durationDays = planetData["durationHours"]/24;
     transitAverageDurationDays = 0.9*durationDays/2;
-    inTransitIndices = [];
-    outTransitIndices = [];
-    # Center of the out transit is n cadences + half the duration + half the duration away from the center of the transit
+    # Center of the out transit is n cadences + one duration away from the center of the transit
     dt = np.min(np.diff(pixelData["time"])) # days
     outTransitBuffer = dt + durationDays
 #    print("allowedBadCadences = " + str(allowedBadCadences))
@@ -177,16 +164,18 @@ def find_transits(pixelData, planetData, allowedBadCadences = 0):
 #    print("transitAverageDurationDays = " + str(transitAverageDurationDays))
     expectedInTransitLength = np.floor(2*transitAverageDurationDays/dt)
 #    print("expected number in transit = ", str(expectedInTransitLength))
+    inTransitIndices = []
+    outTransitIndices = []
+    nBadCadences = []
     for i in transitIndex:
-        thisTransitInIndices = np.argwhere(
-            (np.abs(pixelData["time"][i] - pixelData["time"]) < transitAverageDurationDays))
-    
-        thisTransitOutIndices = np.argwhere(
-            (np.abs((pixelData["time"][i] - outTransitBuffer) - pixelData["time"]) < transitAverageDurationDays)
-            | (np.abs((pixelData["time"][i] + outTransitBuffer) - pixelData["time"]) < transitAverageDurationDays))
-            
+        thisTransitInIndices = np.nonzero(
+            (np.abs(pixelData["time"][i] - pixelData["time"]) < transitAverageDurationDays))[0]
+        thisTransitOutIndices = np.nonzero(
+            (np.abs(pixelData["time"][i] - pixelData["time"]) > (outTransitBuffer - transitAverageDurationDays))
+            & (np.abs(pixelData["time"][i] - pixelData["time"]) < (outTransitBuffer + transitAverageDurationDays)))[0]
+        thisTransitBadCadences = np.sum(pixelData["quality"][thisTransitInIndices] != 0) + np.sum(pixelData["quality"][thisTransitOutIndices] != 0)
 #        print(sum(pixelData["quality"][thisTransitInIndices] > 0) + sum(pixelData["quality"][thisTransitOutIndices] > 0))
-        if (len(thisTransitInIndices) < expectedInTransitLength) | (len(thisTransitOutIndices) < 2*expectedInTransitLength) | (sum(pixelData["quality"][thisTransitInIndices] > 0) + sum(pixelData["quality"][thisTransitOutIndices] > 0) > allowedBadCadences):
+        if (len(thisTransitInIndices) < expectedInTransitLength) | (len(thisTransitOutIndices) < 2*expectedInTransitLength):
             continue
 #        print("transit " + str(i) + ":")
 #        print([len(thisTransitInIndices), expectedInTransitLength])
@@ -196,12 +185,17 @@ def find_transits(pixelData, planetData, allowedBadCadences = 0):
 #        if np.any(pixelData["quality"][thisTransitOutIndices] > 0):
 #            print("out transit bad quality flags: " + str(pixelData["quality"][thisTransitOutIndices]))
 
-        inTransitIndices = np.append(inTransitIndices, thisTransitInIndices[pixelData["quality"][thisTransitInIndices] == 0])
-        outTransitIndices = np.append(outTransitIndices, thisTransitOutIndices[pixelData["quality"][thisTransitOutIndices] == 0])
-
-    inTransitIndices = np.array(inTransitIndices).astype(int)
-    outTransitIndices = np.array(outTransitIndices).astype(int)
-
+        inTransitIndices.append(thisTransitInIndices[pixelData["quality"][thisTransitInIndices] == 0].tolist())
+        outTransitIndices.append(thisTransitOutIndices[pixelData["quality"][thisTransitOutIndices] == 0].tolist())
+        nBadCadences.append(thisTransitBadCadences)
+    alert=False
+    if np.min(nBadCadences) > allowedBadCadences:
+        print("No good transits based on %i allowed bad cadences; using transit with %i bad cadences." % (allowedBadCadences, np.min(nBadCadences)))
+        alert=True
+    goodTransits = (nBadCadences <= np.max([allowedBadCadences, np.min(nBadCadences)]))
+    inTransitIndices = np.unique(sum(np.array(inTransitIndices)[goodTransits].tolist(), []))
+    outTransitIndices = np.unique(sum(np.array(outTransitIndices)[goodTransits].tolist(), []))
+    planetData["badCadenceAlert"] = alert
     return inTransitIndices, outTransitIndices, transitIndex
 
 def make_difference_image(pixelData, inTransitIndices, outTransitIndices):
@@ -361,25 +355,30 @@ def draw_difference_image(diffImageData, pixelData, ticData, planetData, catalog
 #        if (catalogData["ticMag"][s]-catalogData["ticMag"][0] < dMagThreshold):
         f.write(str(s) + ", " + str(id) + ", " + str(catalogData["ticMag"][s]) + ", " + str(np.round(catalogData["separation"][s], 3)) + "\n")
     f.close()
-
+    if planetData["badCadenceAlert"]:
+        alertText = ", no good transits!!!"
+        alertColor = "r"
+    else:
+        alertText = ""
+        alertColor = "k"
     fig, ax = plt.subplots(figsize=(12,10))
     draw_pix_catalog(diffImageData["diffImage"], catalogData, ax=ax, dMagThreshold = dMagThreshold)
-    plt.title("diff image");
+    plt.title("diff image" + alertText, color=alertColor);
     plt.savefig(ticName + "/diffImage_planet" + str(planetData["planetID"]) + "_sector" + str(pixelData["sector"]) + "_camera" + str(pixelData["camera"]) + ".pdf",bbox_inches='tight')
 
     fig, ax = plt.subplots(figsize=(12,10))
     draw_pix_catalog(diffImageData["diffImage"], catalogData, ax=ax, close=True)
-    plt.title("diff image close");
+    plt.title("diff image close" + alertText, color=alertColor);
     plt.savefig(ticName + "/diffImageClose_planet" + str(planetData["planetID"]) + "_sector" + str(pixelData["sector"]) + "_camera" + str(pixelData["camera"]) + ".pdf",bbox_inches='tight')
 
     fig, ax = plt.subplots(figsize=(12,10))
     draw_pix_catalog(diffImageData["diffImageSigma"], catalogData, ax=ax, dMagThreshold = dMagThreshold)
-    plt.title("SNR diff image");
+    plt.title("SNR diff image" + alertText, color=alertColor);
     plt.savefig(ticName + "/diffImageSNR_planet" + str(planetData["planetID"]) + "_sector" + str(pixelData["sector"]) + "_camera" + str(pixelData["camera"]) + ".pdf",bbox_inches='tight')
 
     fig, ax = plt.subplots(figsize=(12,10))
     draw_pix_catalog(diffImageData["diffImageSigma"], catalogData, ax=ax, close=True)
-    plt.title("SNR diff image close");
+    plt.title("SNR diff image close" + alertText, color=alertColor);
     plt.savefig(ticName + "/diffImageSNRClose_planet" + str(planetData["planetID"]) + "_sector" + str(pixelData["sector"]) + "_camera" + str(pixelData["camera"]) + ".pdf",bbox_inches='tight')
     
     fig, ax = plt.subplots(figsize=(12,10))
