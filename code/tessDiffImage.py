@@ -81,7 +81,7 @@ def make_planet_difference_image(ticData, planetData, pixelData, catalogData, ti
     draw_lc_transits(pixelData, planetData, inTransitIndices, outTransitIndices, transitIndex, ticName)
 
     f = open(ticName + "/imageData_planet" + str(planetData["planetID"]) + "_sector" + str(pixelData["sector"]) + "_camera" + str(pixelData["camera"]) + ".pickle", 'wb')
-    pickle.dump([diffImageData, catalogData, pixelData, inTransitIndices, outTransitIndices, transitIndex], f, pickle.HIGHEST_PROTOCOL)
+    pickle.dump([diffImageData, catalogData, pixelData, inTransitIndices, outTransitIndices, transitIndex, planetData], f, pickle.HIGHEST_PROTOCOL)
     f.close()
 
 
@@ -145,6 +145,8 @@ def find_transit_times(pixelData, planetData):
     flagGaps = np.abs(pixelData["time"][transitIndex] - transitTimes) > bufferRatio*dt
     for i in np.nonzero(flagGaps)[0]:
         print("large cadence difference: " + str(pixelData["time"][transitIndex][i] - transitTimes[i]))
+    transitTimes = transitTimes[~flagGaps]
+    transitIndex = transitIndex[~flagGaps]
     return transitTimes, transitIndex
 
 def find_transits(pixelData, planetData, allowedBadCadences = 0):
@@ -185,11 +187,14 @@ def find_transits(pixelData, planetData, allowedBadCadences = 0):
         inTransitIndices.append(thisTransitInIndices[pixelData["quality"][thisTransitInIndices] == 0].tolist())
         outTransitIndices.append(thisTransitOutIndices[pixelData["quality"][thisTransitOutIndices] == 0].tolist())
         nBadCadences.append(thisTransitBadCadences)
-
+    alert=False
+    if np.min(nBadCadences) > allowedBadCadences:
+        print("No good transits based on %i allowed bad cadences; using transit with %i bad cadences." % (allowedBadCadences, np.min(nBadCadences)))
+        alert=True
     goodTransits = (nBadCadences <= np.max([allowedBadCadences, np.min(nBadCadences)]))
     inTransitIndices = np.unique(sum(np.array(inTransitIndices)[goodTransits].tolist(), []))
     outTransitIndices = np.unique(sum(np.array(outTransitIndices)[goodTransits].tolist(), []))
-
+    planetData["badCadenceAlert"] = alert
     return inTransitIndices, outTransitIndices, transitIndex
 
 def make_difference_image(pixelData, inTransitIndices, outTransitIndices):
@@ -349,25 +354,30 @@ def draw_difference_image(diffImageData, pixelData, ticData, planetData, catalog
 #        if (catalogData["ticMag"][s]-catalogData["ticMag"][0] < dMagThreshold):
         f.write(str(s) + ", " + str(id) + ", " + str(catalogData["ticMag"][s]) + ", " + str(np.round(catalogData["separation"][s], 3)) + "\n")
     f.close()
-
+    if planetData["badCadenceAlert"]:
+        alertText = ", no good transits!!!"
+        alertColor = "r"
+    else:
+        alertText = ""
+        alertColor = "k"
     fig, ax = plt.subplots(figsize=(12,10))
     draw_pix_catalog(diffImageData["diffImage"], catalogData, ax=ax, dMagThreshold = dMagThreshold)
-    plt.title("diff image");
+    plt.title("diff image" + alertText, color=alertColor);
     plt.savefig(ticName + "/diffImage_planet" + str(planetData["planetID"]) + "_sector" + str(pixelData["sector"]) + "_camera" + str(pixelData["camera"]) + ".pdf",bbox_inches='tight')
 
     fig, ax = plt.subplots(figsize=(12,10))
     draw_pix_catalog(diffImageData["diffImage"], catalogData, ax=ax, close=True)
-    plt.title("diff image close");
+    plt.title("diff image close" + alertText, color=alertColor);
     plt.savefig(ticName + "/diffImageClose_planet" + str(planetData["planetID"]) + "_sector" + str(pixelData["sector"]) + "_camera" + str(pixelData["camera"]) + ".pdf",bbox_inches='tight')
 
     fig, ax = plt.subplots(figsize=(12,10))
     draw_pix_catalog(diffImageData["diffImageSigma"], catalogData, ax=ax, dMagThreshold = dMagThreshold)
-    plt.title("SNR diff image");
+    plt.title("SNR diff image" + alertText, color=alertColor);
     plt.savefig(ticName + "/diffImageSNR_planet" + str(planetData["planetID"]) + "_sector" + str(pixelData["sector"]) + "_camera" + str(pixelData["camera"]) + ".pdf",bbox_inches='tight')
 
     fig, ax = plt.subplots(figsize=(12,10))
     draw_pix_catalog(diffImageData["diffImageSigma"], catalogData, ax=ax, close=True)
-    plt.title("SNR diff image close");
+    plt.title("SNR diff image close" + alertText, color=alertColor);
     plt.savefig(ticName + "/diffImageSNRClose_planet" + str(planetData["planetID"]) + "_sector" + str(pixelData["sector"]) + "_camera" + str(pixelData["camera"]) + ".pdf",bbox_inches='tight')
     
     fig, ax = plt.subplots(figsize=(12,10))
