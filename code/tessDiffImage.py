@@ -166,7 +166,7 @@ def find_transits(pixelData, planetData, allowedBadCadences = 0):
 #    print("expected number in transit = ", str(expectedInTransitLength))
     inTransitIndices = []
     outTransitIndices = []
-    badCadences = []
+    nBadCadences = []
     for i in transitIndex:
         thisTransitInIndices = np.nonzero(
             (np.abs(pixelData["time"][i] - pixelData["time"]) < transitAverageDurationDays))[0]
