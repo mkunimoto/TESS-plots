@@ -13,6 +13,7 @@ from astroquery.mast import Catalogs
 import pickle
 
 import tess_stars2px as trdp
+import barycentricCorrection as bc
 
 def make_ffi_difference_image(ticData, thisPlanet=None, nPixOnSide = 20, dMagThreshold = 4, allowedBadCadences = 2):
     fitsList = get_tess_cut(ticData["id"], ticData["raDegrees"], ticData["decDegrees"], ticData["sector"], nPixOnSide = nPixOnSide)
@@ -118,21 +119,35 @@ def get_cadence_data(fitsFile):
     pixelData["referenceRow"] = binHeader["2CRPX4"] # reference pixel along axis 1
     pixelData["referenceRa"] = binHeader["1CRVL4"] # reference pixel ra in degrees
     pixelData["referenceDec"] = binHeader["2CRVL4"] # reference pixel dec in degrees
-    pixelData["cornerCol"] = binHeader["1CRV4P"] # reference pixel ra in degrees
-    pixelData["cornerRow"] = binHeader["2CRV4P"] # reference pixel dec in degrees
-    pixelData["sector"] = priHeader["SECTOR"] # reference pixel dec in degrees
-    pixelData["camera"] = priHeader["CAMERA"] # reference pixel dec in degrees
-    pixelData["ccd"] = priHeader["CCD"] # reference pixel dec in degrees
+    pixelData["cornerCol"] = binHeader["1CRV4P"] # corner ra in degrees
+    pixelData["cornerRow"] = binHeader["2CRV4P"] # corner dec in degrees
+    pixelData["sector"] = priHeader["SECTOR"] # FFI sector
+    pixelData["camera"] = priHeader["CAMERA"] # FFI camera
+    pixelData["ccd"] = priHeader["CCD"] # FFI ccd
 
-    pixelData["time"] = np.zeros(len(cadenceData))
+    pixelData["rawTime"] = np.zeros(len(cadenceData))
+    pixelData["ffiBarycentricCorrection"] = np.zeros(len(cadenceData))
     pixelData["flux"] = np.zeros((len(cadenceData), cadenceData[0][4].shape[0], cadenceData[0][4].shape[1]))
     pixelData["fluxErr"] = np.zeros((len(cadenceData), cadenceData[0][4].shape[0], cadenceData[0][4].shape[1]))
     pixelData["quality"] = np.zeros(len(cadenceData))
-    for i in range(len(pixelData["time"])):
-        pixelData["time"][i] = cadenceData[i][0]
+    for i in range(len(pixelData["rawTime"])):
+        pixelData["rawTime"][i] = cadenceData[i][0]
+        pixelData["ffiBarycentricCorrection"][i] = cadenceData[i][1]
         pixelData["flux"][i,:,:] = cadenceData[i][4]
         pixelData["fluxErr"][i,:,:] = cadenceData[i][5]
         pixelData["quality"][i] = cadenceData[i][8]
+        
+    # perform the barycentric correction
+    # Tess cut time is barycentric correccted to the center of the source FFI
+    # so compute the spacecraft clock time by subtracting the supplied
+    # barycentric correction, and them computing the barycentric correction
+    # for the target RA and Dec.  We use the reference pixel RA and Dec
+    baryCorrector = bc.barycentricCorrection()
+    tessToJulianOffset = 2457000
+    spacecraftTime = pixelData["rawTime"] - pixelData["ffiBarycentricCorrection"]
+    pixelData["barycentricCorrection"], _ = baryCorrector.computeCorrection(spacecraftTime + tessToJulianOffset,
+                                             pixelData["referenceRa"], pixelData["referenceDec"])
+    pixelData["time"] = spacecraftTime + pixelData["barycentricCorrection"]
         
 #    print("time: " + str([np.min(pixelData["time"]), np.max(pixelData["time"])]))
     return pixelData

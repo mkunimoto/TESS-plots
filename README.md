@@ -17,6 +17,8 @@ Requirements:
 - pickle
 - tess-point
 
+This tool uses TESS Spice kernels to compute the barycentric time correction for the specific target.  In addition to the included TESS merged ephemeris file (.bsp) and leap seconds file (.tls), this requires a planetary ephemeris file, which is larger than the maximum file size allowed by GitHub.  Before you can use this tool you must download the planeary ephemeris file, found at https://archive.stsci.edu/missions/tess/models/tess2018338154429-41241_de430.bsp
+
 ## 2. Diagnostic plots
 
 This tools plots TESS lightcurves in various views useful for visually reviewing planet candidates. In particular, raw and detrended lightcurves, phase diagrams, odd- and even- transits, and potential secondaries in the lightcurve are shown, which are all informative ways to identify false positives and false alarms. The plot also displays the differences images from above on the same page, so both flux- and pixel-level vetting are available. See `example/example_diagnosticplot.ipynb` for an example use of this tool.
