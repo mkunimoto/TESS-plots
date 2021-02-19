@@ -5,7 +5,9 @@ import numpy as np
 import array
 
 class barycentricCorrection:
-    def __init__(self, tlsFile = None, ephemFile = None, planetFile = None, spacecraftCode='-95'):
+    def __init__(self, spiceFileLocation = ".", tlsFile = None, ephemFile = None, planetFile = None, spacecraftCode='-95'):
+        self.spiceFileLocation = spiceFileLocation
+    
         # code -95 is TESS, though it's called Mgs Simulation
         self.spacecraftCode = spacecraftCode
         
@@ -17,7 +19,9 @@ class barycentricCorrection:
                 raise
             self.tlsFile = tlsFile
         if (planetFile == None) & (spacecraftCode == '-95'):
-            self.planetFile = 'tess2018338154429-41241_de430.bsp'
+#            self.planetFile = 'tess2018338154429-41241_de430.bsp'
+            self.planetFile = 'de432s.bsp'
+            print("loaded de432s.bsp")
         else:
             if planetFile == None:
                 print("if we're not TESS we need a specified planet ephemeris (e.g. de430) file!!")
@@ -31,9 +35,9 @@ class barycentricCorrection:
                 raise
             self.bspFile = ephemFile
             
-        spice.furnsh(self.tlsFile)
-        spice.furnsh(self.planetFile)
-        spice.furnsh(self.ephemFile)
+        spice.furnsh(self.spiceFileLocation + "/" + self.tlsFile)
+        spice.furnsh(self.spiceFileLocation + "/" + self.planetFile)
+        spice.furnsh(self.spiceFileLocation + "/" + self.ephemFile)
 
     def computeCorrection(self, spacecraftJulianTime, ra, dec):
 
