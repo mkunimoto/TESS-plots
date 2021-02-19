@@ -18,9 +18,6 @@ Requirements:
 - tess-point
 - spicepy
 
-This tool uses TESS Spice kernels to compute the barycentric time correction for the specific target.  In addition to the included TESS merged ephemeris file (.bsp) and leap seconds file (.tls), this requires a planetary ephemeris file, which is larger than the maximum file size allowed by GitHub.  Before you can use this tool you must download the planeary ephemeris file, found at https://archive.stsci.edu/missions/tess/models/tess2018338154429-41241_de430.bsp
-
-At the moment the .bsp and .tls files are assumed to be in the local directory where this tool is called.  We'll fix this shortly.
 
 ## 2. Diagnostic plots
 
