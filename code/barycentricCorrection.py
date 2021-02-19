@@ -21,7 +21,6 @@ class barycentricCorrection:
         if (planetFile == None) & (spacecraftCode == '-95'):
 #            self.planetFile = 'tess2018338154429-41241_de430.bsp'
             self.planetFile = 'de432s.bsp'
-            print("loaded de432s.bsp")
         else:
             if planetFile == None:
                 print("if we're not TESS we need a specified planet ephemeris (e.g. de430) file!!")
