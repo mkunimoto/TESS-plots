@@ -33,7 +33,8 @@ class tessDiffImage:
         self.nPixOnSide = nPixOnSide
         self.dMagThreshold = dMagThreshold
         self.allowedBadCadences = allowedBadCadences
-        
+        self.ticName = "tic" + str(self.ticData["id"])
+
         self.baryCorrector = bc.barycentricCorrection(self.spiceFileLocation)
 
 
@@ -42,7 +43,6 @@ class tessDiffImage:
             allowedBadCadences = self.allowedBadCadences
             
         fitsList = self.get_tess_cut()
-        ticName = "tic" + str(self.ticData["id"])
         for fitsFile in fitsList:
             pixelData = self.get_cadence_data(fitsFile)
             # check that this is the camera and sector that we want here
@@ -65,23 +65,23 @@ class tessDiffImage:
             else:
                 print("no sector quality flags of the same length as FFI quality flags")
 
-            catalogData = self.make_stellar_scene(pixelData, ticName)
+            catalogData = self.make_stellar_scene(pixelData)
             
             if thisPlanet == None:
                 for p, planetData in enumerate(self.ticData["planetData"]):
                     planetData["planetIndex"] = p
                     planetData["planetID"] = p
-                    self.make_planet_difference_image(self.ticData, planetData, pixelData, catalogData, ticName, allowedBadCadences = allowedBadCadences)
+                    self.make_planet_difference_image(self.ticData, planetData, pixelData, catalogData, allowedBadCadences = allowedBadCadences)
             else:
                 planetData = self.ticData["planetData"][thisPlanet]
                 planetData["planetIndex"] = thisPlanet
                 planetData["planetID"] = thisPlanet
-                self.make_planet_difference_image(planetData, pixelData, catalogData, ticName, allowedBadCadences = allowedBadCadences)
+                self.make_planet_difference_image(planetData, pixelData, catalogData, allowedBadCadences = allowedBadCadences)
 
-        #       print('rm ' + ticName + '/*.fits')
-        os.system('rm ' + ticName + '/*.fits')
+        #       print('rm ' + self.ticName + '/*.fits')
+        os.system('rm ' + self.ticName + '/*.fits')
 
-    def make_planet_difference_image(self, planetData, pixelData, catalogData, ticName, allowedBadCadences = None):
+    def make_planet_difference_image(self, planetData, pixelData, catalogData, allowedBadCadences = None):
         if allowedBadCadences == None:
             allowedBadCadences = self.allowedBadCadences
             
@@ -106,10 +106,10 @@ class tessDiffImage:
 
         inTransitIndices, outTransitIndices, transitIndex = self.find_transits(pixelData, planetData, allowedBadCadences = allowedBadCadences)
         diffImageData = self.make_difference_image(pixelData, inTransitIndices, outTransitIndices)
-        self.draw_difference_image(diffImageData, pixelData, planetData, catalogData, ticName)
-        self.draw_lc_transits(pixelData, planetData, inTransitIndices, outTransitIndices, transitIndex, ticName)
+        self.draw_difference_image(diffImageData, pixelData, planetData, catalogData)
+        self.draw_lc_transits(pixelData, planetData, inTransitIndices, outTransitIndices, transitIndex)
 
-        f = open(ticName + "/imageData_planet" + str(planetData["planetID"]) + "_sector" + str(pixelData["sector"]) + "_camera" + str(pixelData["camera"]) + ".pickle", 'wb')
+        f = open(self.ticName + "/imageData_planet" + str(planetData["planetID"]) + "_sector" + str(pixelData["sector"]) + "_camera" + str(pixelData["camera"]) + ".pickle", 'wb')
         pickle.dump([diffImageData, catalogData, pixelData, inTransitIndices, outTransitIndices, transitIndex, planetData], f, pickle.HIGHEST_PROTOCOL)
         f.close()
 
@@ -119,7 +119,7 @@ class tessDiffImage:
         ra = self.ticData["raDegrees"]
         dec = self.ticData["decDegrees"]
         sector = self.ticData["sector"]
-        ticName = "tic" + str(ticNumber)
+        ticName = self.ticName
         if sector == None:
             curlStr = 'curl "https://mast.stsci.edu/tesscut/api/v0.1/astrocut?ra=' \
                         + str(ra) + '&dec=' + str(dec) + '&y=' + str(self.nPixOnSide) + '&x=' + str(self.nPixOnSide) \
@@ -176,9 +176,11 @@ class tessDiffImage:
         # for the target RA and Dec.  We use the reference pixel RA and Dec
         tessToJulianOffset = 2457000
         spacecraftTime = pixelData["rawTime"] - pixelData["ffiBarycentricCorrection"]
-        pixelData["barycentricCorrection"], _ = self.baryCorrector.computeCorrection(spacecraftTime + tessToJulianOffset,
+        pixelData["barycentricCorrection"], pixelData["validBarycentricCorrection"] = self.baryCorrector.computeCorrection(spacecraftTime + tessToJulianOffset,
                                                  pixelData["referenceRa"], pixelData["referenceDec"])
         pixelData["time"] = spacecraftTime + pixelData["barycentricCorrection"]
+        if np.any(pixelData["validBarycentricCorrection"] == False):
+            print("Some cadences have an invalid barycentric correction")
             
     #    print("time: " + str([np.min(pixelData["time"]), np.max(pixelData["time"])]))
         return pixelData
@@ -253,18 +255,20 @@ class tessDiffImage:
         meanOutTransit = np.mean(pixelData["flux"][outTransitIndices,::-1,:], axis=0)
         meanOutTransitSigma = np.sqrt(np.mean(pixelData["fluxErr"][outTransitIndices,::-1,:]**2, axis=0)/len(outTransitIndices))
         diffImage = meanOutTransit-meanInTransit
-        diffImageSigma = (meanOutTransit-meanInTransit)/np.sqrt((meanInTransitSigma/np.sqrt(len(inTransitIndices)))+(meanOutTransitSigma/np.sqrt(len(outTransitIndices))))
-        
+        diffImageSigma = np.sqrt((meanInTransitSigma**2)+(meanOutTransitSigma**2))
+        diffSNRImage = diffImage/diffImageSigma
+
         diffImageData = {}
         diffImageData["diffImage"] = diffImage
         diffImageData["diffImageSigma"] = diffImageSigma
+        diffImageData["diffSNRImage"] = diffSNRImage
         diffImageData["meanInTransit"] = meanInTransit
         diffImageData["meanInTransitSigma"] = meanInTransitSigma
         diffImageData["meanOutTransit"] = meanOutTransit
         diffImageData["meanOutTransitSigma"] = meanOutTransitSigma
         return diffImageData
         
-    def make_stellar_scene(self, pixelData, ticName):
+    def make_stellar_scene(self, pixelData):
         catalogData = {}
         
         # compute mjd for the Gaia epoch J2015.5 = 2015-07-02T21:00:00
@@ -390,11 +394,11 @@ class tessDiffImage:
         ax.set_xlim(catalogData[ex][0], catalogData[ex][1])
         ax.set_ylim(catalogData[ex][2], catalogData[ex][3])
 
-    def draw_difference_image(self, diffImageData, pixelData, planetData, catalogData, ticName = None, dMagThreshold = None):
+    def draw_difference_image(self, diffImageData, pixelData, planetData, catalogData, dMagThreshold = None):
         if dMagThreshold == None:
             dMagThreshold = self.dMagThreshold
 
-        f = open(ticName + "/ticKey_planet" + str(planetData["planetID"]) + "_sector" + str(pixelData["sector"]) + "_camera" + str(pixelData["camera"]) + ".txt", 'w')
+        f = open(self.ticName + "/ticKey_planet" + str(planetData["planetID"]) + "_sector" + str(pixelData["sector"]) + "_camera" + str(pixelData["camera"]) + ".txt", 'w')
         f.write("# index, TIC ID, TMag, separation (arcsec)\n")
         for s, id in enumerate(catalogData["ticID"]):
     #        if (catalogData["ticMag"][s]-catalogData["ticMag"][0] < dMagThreshold):
@@ -409,39 +413,39 @@ class tessDiffImage:
         fig, ax = plt.subplots(figsize=(12,10))
         self.draw_pix_catalog(diffImageData["diffImage"], catalogData, ax=ax, dMagThreshold = dMagThreshold)
         plt.title("diff image" + alertText, color=alertColor);
-        plt.savefig(ticName + "/diffImage_planet" + str(planetData["planetID"]) + "_sector" + str(pixelData["sector"]) + "_camera" + str(pixelData["camera"]) + ".pdf",bbox_inches='tight')
+        plt.savefig(self.ticName + "/diffImage_planet" + str(planetData["planetID"]) + "_sector" + str(pixelData["sector"]) + "_camera" + str(pixelData["camera"]) + ".pdf",bbox_inches='tight')
 
         fig, ax = plt.subplots(figsize=(12,10))
         self.draw_pix_catalog(diffImageData["diffImage"], catalogData, ax=ax, close=True)
         plt.title("diff image close" + alertText, color=alertColor);
-        plt.savefig(ticName + "/diffImageClose_planet" + str(planetData["planetID"]) + "_sector" + str(pixelData["sector"]) + "_camera" + str(pixelData["camera"]) + ".pdf",bbox_inches='tight')
+        plt.savefig(self.ticName + "/diffImageClose_planet" + str(planetData["planetID"]) + "_sector" + str(pixelData["sector"]) + "_camera" + str(pixelData["camera"]) + ".pdf",bbox_inches='tight')
 
         fig, ax = plt.subplots(figsize=(12,10))
-        self.draw_pix_catalog(diffImageData["diffImageSigma"], catalogData, ax=ax, dMagThreshold = dMagThreshold)
+        self.draw_pix_catalog(diffImageData["diffSNRImage"], catalogData, ax=ax, dMagThreshold = dMagThreshold)
         plt.title("SNR diff image" + alertText, color=alertColor);
-        plt.savefig(ticName + "/diffImageSNR_planet" + str(planetData["planetID"]) + "_sector" + str(pixelData["sector"]) + "_camera" + str(pixelData["camera"]) + ".pdf",bbox_inches='tight')
+        plt.savefig(self.ticName + "/diffImageSNR_planet" + str(planetData["planetID"]) + "_sector" + str(pixelData["sector"]) + "_camera" + str(pixelData["camera"]) + ".pdf",bbox_inches='tight')
 
         fig, ax = plt.subplots(figsize=(12,10))
-        self.draw_pix_catalog(diffImageData["diffImageSigma"], catalogData, ax=ax, close=True)
+        self.draw_pix_catalog(diffImageData["diffSNRImage"], catalogData, ax=ax, close=True)
         plt.title("SNR diff image close" + alertText, color=alertColor);
-        plt.savefig(ticName + "/diffImageSNRClose_planet" + str(planetData["planetID"]) + "_sector" + str(pixelData["sector"]) + "_camera" + str(pixelData["camera"]) + ".pdf",bbox_inches='tight')
+        plt.savefig(self.ticName + "/diffImageSNRClose_planet" + str(planetData["planetID"]) + "_sector" + str(pixelData["sector"]) + "_camera" + str(pixelData["camera"]) + ".pdf",bbox_inches='tight')
         
         fig, ax = plt.subplots(figsize=(12,10))
         self.draw_pix_catalog(diffImageData["meanOutTransit"], catalogData, ax=ax, magColorBar=True, dMagThreshold = dMagThreshold)
         plt.title("Direct image");
-        plt.savefig(ticName + "/directImage_planet" + str(planetData["planetID"]) + "_sector" + str(pixelData["sector"]) + "_camera" + str(pixelData["camera"]) + ".pdf",bbox_inches='tight')
+        plt.savefig(self.ticName + "/directImage_planet" + str(planetData["planetID"]) + "_sector" + str(pixelData["sector"]) + "_camera" + str(pixelData["camera"]) + ".pdf",bbox_inches='tight')
 
         fig, ax = plt.subplots(figsize=(12,10))
         self.draw_pix_catalog(diffImageData["meanOutTransit"], catalogData, ax=ax, annotate=True, magColorBar=True, dMagThreshold = dMagThreshold)
         plt.title("Direct image");
-        plt.savefig(ticName + "/directImageAnnotated_planet" + str(planetData["planetID"]) + "_sector" + str(pixelData["sector"]) + "_camera" + str(pixelData["camera"]) + ".pdf",bbox_inches='tight')
+        plt.savefig(self.ticName + "/directImageAnnotated_planet" + str(planetData["planetID"]) + "_sector" + str(pixelData["sector"]) + "_camera" + str(pixelData["camera"]) + ".pdf",bbox_inches='tight')
 
         fig, ax = plt.subplots(figsize=(12,10))
         self.draw_pix_catalog(diffImageData["meanOutTransit"], catalogData, ax=ax, close=True)
         plt.title("Direct image close");
-        plt.savefig(ticName + "/directImageClose_planet" + str(planetData["planetID"]) + "_sector" + str(pixelData["sector"]) + "_camera" + str(pixelData["camera"]) + ".pdf",bbox_inches='tight')
+        plt.savefig(self.ticName + "/directImageClose_planet" + str(planetData["planetID"]) + "_sector" + str(pixelData["sector"]) + "_camera" + str(pixelData["camera"]) + ".pdf",bbox_inches='tight')
 
-    def draw_lc_transits(self, pixelData, planetData, inTransitIndices, outTransitIndices, transitIndex, ticName = None, apCenter = [10,10]):
+    def draw_lc_transits(self, pixelData, planetData, inTransitIndices, outTransitIndices, transitIndex, apCenter = [10,10]):
     #    apFlux = pixelData["flux"][:,8:13,8:13]
         apFlux = pixelData["flux"][:,apCenter[0]-2:apCenter[0]+3,apCenter[1]-2:apCenter[1]+3]
         lc = np.sum(np.sum(apFlux,2),1)
@@ -455,6 +459,6 @@ class tessDiffImage:
         plt.legend()
         plt.xlabel("time");
         plt.ylabel("flux (e-/sec)");
-        if ticName != None:
-            plt.savefig(ticName + "/lcTransits_planet" + str(planetData["planetID"]) + "_sector" + str(pixelData["sector"]) + "_camera" + str(pixelData["camera"]) + ".pdf",bbox_inches='tight')
+        
+        plt.savefig(self.ticName + "/lcTransits_planet" + str(planetData["planetID"]) + "_sector" + str(pixelData["sector"]) + "_camera" + str(pixelData["camera"]) + ".pdf",bbox_inches='tight')
 
