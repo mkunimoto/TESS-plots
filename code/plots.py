@@ -214,9 +214,9 @@ def plot_report(star, planet, imageData):
     plot_vs_phase(axHalf, time, flux, epo, per, dur, sigma, fs, ms, phs=0.5)
     axHalf.set_xlabel('Hours from Secondary (Phase 0.50)',fontsize=fs)
     # Difference Images
-    draw_pix_catalog(imageData[0]['diffImageSigma'], imageData[1], ax=axDiff1, filterStars=True, dMagThreshold=4, fs=fs, ss=10)
+    draw_pix_catalog(imageData[0]['diffSNRImage'], imageData[1], ax=axDiff1, filterStars=True, dMagThreshold=4, fs=fs, ss=10)
     axDiff1.set_title('Diff Image SNR', fontsize=fs)
-    draw_pix_catalog(imageData[0]['diffImageSigma'], imageData[1], ax=axDiff2, close=True, filterStars=True, dMagThreshold=4, fs=fs, ss=40)
+    draw_pix_catalog(imageData[0]['diffSNRImage'], imageData[1], ax=axDiff2, close=True, filterStars=True, dMagThreshold=4, fs=fs, ss=40)
     axDiff2.set_title('Diff Image SNR (Close)', fontsize=fs)
     draw_pix_catalog(imageData[0]['meanOutTransit'], imageData[1], ax=axDir1, filterStars=True, dMagThreshold=4, fs=fs, ss=10)
     axDir1.set_title('Direct Image', fontsize=fs)
