@@ -27,7 +27,7 @@ def get_tic(ra, dec, radiusDegrees):
     return Catalogs.query_region(str(ra) + " " + str(dec), radius=radiusDegrees, catalog="TIC")
 
 class tessDiffImage:
-    def __init__(self, ticData, spiceFileLocation = ".", nPixOnSide = 20, dMagThreshold = 4, allowedBadCadences = 2):
+    def __init__(self, ticData, spiceFileLocation = ".", nPixOnSide = 20, dMagThreshold = 4, allowedBadCadences = 0):
         self.ticData = ticData
         self.spiceFileLocation = spiceFileLocation
         self.nPixOnSide = nPixOnSide
