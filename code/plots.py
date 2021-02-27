@@ -5,7 +5,8 @@ import numpy as np
 from astroquery.mast import Catalogs
 from brokenaxes import brokenaxes
 from scipy.stats import binned_statistic
-from tessDiffImage import draw_pix_catalog
+
+import tessDiffImage
 
 def phase_diagram(time, flux, epo, per, frac):
     t = (time - epo) % per
@@ -214,13 +215,14 @@ def plot_report(star, planet, imageData):
     plot_vs_phase(axHalf, time, flux, epo, per, dur, sigma, fs, ms, phs=0.5)
     axHalf.set_xlabel('Hours from Secondary (Phase 0.50)',fontsize=fs)
     # Difference Images
-    draw_pix_catalog(imageData[0]['diffSNRImage'], imageData[1], ax=axDiff1, filterStars=True, dMagThreshold=4, fs=fs, ss=10)
+    tdi = tessDiffImage.tessDiffImage(star,spiceFileLocation = "..")
+    tdi.draw_pix_catalog(imageData[0]['diffSNRImage'], imageData[1], ax=axDiff1, filterStars=True, dMagThreshold=4, fs=fs, ss=10)
     axDiff1.set_title('Diff Image SNR', fontsize=fs)
-    draw_pix_catalog(imageData[0]['diffSNRImage'], imageData[1], ax=axDiff2, close=True, filterStars=True, dMagThreshold=4, fs=fs, ss=40)
+    tdi.draw_pix_catalog(imageData[0]['diffSNRImage'], imageData[1], ax=axDiff2, close=True, filterStars=True, dMagThreshold=4, fs=fs, ss=40)
     axDiff2.set_title('Diff Image SNR (Close)', fontsize=fs)
-    draw_pix_catalog(imageData[0]['meanOutTransit'], imageData[1], ax=axDir1, filterStars=True, dMagThreshold=4, fs=fs, ss=10)
+    tdi.draw_pix_catalog(imageData[0]['meanOutTransit'], imageData[1], ax=axDir1, filterStars=True, dMagThreshold=4, fs=fs, ss=10)
     axDir1.set_title('Direct Image', fontsize=fs)
-    draw_pix_catalog(imageData[0]['meanOutTransit'], imageData[1], ax=axDir2, close=True, filterStars=True, dMagThreshold=4, fs=fs, ss=40)
+    tdi.draw_pix_catalog(imageData[0]['meanOutTransit'], imageData[1], ax=axDir2, close=True, filterStars=True, dMagThreshold=4, fs=fs, ss=40)
     axDir2.set_title('Direct Image (Close)', fontsize=fs)
     # Text
     plot_text(axText, star, planet, 0.15, 0.035, 0.95, 8)
