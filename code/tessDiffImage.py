@@ -104,8 +104,8 @@ class tessDiffImage:
         pixelData["inOtherTransit"] = np.zeros(pixelData["quality"].shape)
         pixelData["inOtherTransit"][inOtherTransitIndices] = 1
 
-        inTransitIndices, outTransitIndices, transitIndex = self.find_transits(pixelData, planetData, allowedBadCadences = allowedBadCadences)
-        diffImageData = self.make_difference_image(pixelData, inTransitIndices, outTransitIndices)
+        inTransitIndices, outTransitIndices, transitIndex, diffImageData = self.find_transits(pixelData, planetData, allowedBadCadences = allowedBadCadences)
+#        diffImageData = self.make_difference_image(pixelData, inTransitIndices, outTransitIndices)
         self.draw_difference_image(diffImageData, pixelData, planetData, catalogData)
         self.draw_lc_transits(pixelData, planetData, inTransitIndices, outTransitIndices, transitIndex)
 
@@ -218,6 +218,7 @@ class tessDiffImage:
         inTransitIndices = []
         outTransitIndices = []
         nBadCadences = []
+        DiffImageDataList = []
         for i in transitIndex:
             thisTransitInIndices = np.nonzero(
                 (np.abs(pixelData["time"][i] - pixelData["time"]) < transitAverageDurationDays))[0]
@@ -235,19 +236,54 @@ class tessDiffImage:
     #            print("in transit bad quality flags: " + str(pixelData["quality"][thisTransitInIndices]))
     #        if np.any(pixelData["quality"][thisTransitOutIndices] > 0):
     #            print("out transit bad quality flags: " + str(pixelData["quality"][thisTransitOutIndices]))
+    
+            thisTransitInIndices = thisTransitInIndices[pixelData["quality"][thisTransitInIndices] == 0].tolist()
+            thisTransitOutIndices = thisTransitOutIndices[pixelData["quality"][thisTransitOutIndices] == 0].tolist()
+            DiffImageDataList.append(self.make_difference_image(pixelData, thisTransitInIndices, thisTransitOutIndices))
 
-            inTransitIndices.append(thisTransitInIndices[pixelData["quality"][thisTransitInIndices] == 0].tolist())
-            outTransitIndices.append(thisTransitOutIndices[pixelData["quality"][thisTransitOutIndices] == 0].tolist())
+            inTransitIndices.append(thisTransitInIndices)
+            outTransitIndices.append(thisTransitOutIndices)
             nBadCadences.append(thisTransitBadCadences)
+            
+            
         alert=False
         if np.min(nBadCadences) > allowedBadCadences:
             print("No good transits based on %i allowed bad cadences; using transit with %i bad cadences." % (allowedBadCadences, np.min(nBadCadences)))
             alert=True
         goodTransits = (nBadCadences <= np.max([allowedBadCadences, np.min(nBadCadences)]))
+        
+        diffImageData = {}
+        nTranitImages = 0
+        diffImageData["diffImage"] = np.zeros(DiffImageDataList[0]["diffImage"].shape)
+        diffImageData["diffImageSigma"] = np.zeros(DiffImageDataList[0]["diffImage"].shape)
+        diffImageData["diffSNRImage"] = np.zeros(DiffImageDataList[0]["diffImage"].shape)
+        diffImageData["meanInTransit"] = np.zeros(DiffImageDataList[0]["diffImage"].shape)
+        diffImageData["meanInTransitSigma"] = np.zeros(DiffImageDataList[0]["diffImage"].shape)
+        diffImageData["meanOutTransit"] = np.zeros(DiffImageDataList[0]["diffImage"].shape)
+        diffImageData["meanOutTransitSigma"] = np.zeros(DiffImageDataList[0]["diffImage"].shape)
+        for i in range(len(DiffImageDataList)):
+            if goodTransits[i]:
+                diffImageData["diffImage"] += DiffImageDataList[i]["diffImage"]
+                diffImageData["diffImageSigma"] += DiffImageDataList[i]["diffImageSigma"]**2
+                diffImageData["meanInTransit"] += DiffImageDataList[i]["meanInTransit"]
+                diffImageData["meanInTransitSigma"] += DiffImageDataList[i]["meanInTransitSigma"]**2
+                diffImageData["meanOutTransit"] += DiffImageDataList[i]["meanOutTransit"]
+                diffImageData["meanOutTransitSigma"] += DiffImageDataList[i]["meanOutTransitSigma"]**2
+                nTranitImages += 1
+        diffImageData["diffImage"] /= nTranitImages
+        diffImageData["diffImageSigma"] = np.sqrt(diffImageData["diffImageSigma"])/nTranitImages
+        diffImageData["meanInTransit"] /= nTranitImages
+        diffImageData["meanInTransitSigma"] = np.sqrt(diffImageData["meanInTransitSigma"])/nTranitImages
+        diffImageData["meanOutTransit"] /= nTranitImages
+        diffImageData["meanOutTransitSigma"] = np.sqrt(diffImageData["meanOutTransitSigma"])/nTranitImages
+        diffImageData["diffSNRImage"] = diffImageData["diffImage"]/diffImageData["diffImageSigma"]
+
+        
         inTransitIndices = np.unique(sum(np.array(inTransitIndices)[goodTransits].tolist(), []))
         outTransitIndices = np.unique(sum(np.array(outTransitIndices)[goodTransits].tolist(), []))
         planetData["badCadenceAlert"] = alert
-        return inTransitIndices, outTransitIndices, transitIndex
+        
+        return inTransitIndices, outTransitIndices, transitIndex, diffImageData
 
     def make_difference_image(self, pixelData, inTransitIndices, outTransitIndices):
         meanInTransit = np.mean(pixelData["flux"][inTransitIndices,::-1,:], axis=0)
