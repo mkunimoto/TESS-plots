@@ -1,0 +1,13 @@
+
+.DS_Store
+code/__pycache__/barycentricCorrection.cpython-37.pyc
+code/__pycache__/barycentricCorrection.cpython-39.pyc
+code/__pycache__/plots.cpython-39.pyc
+code/__pycache__/tessDiffImage.cpython-37.pyc
+code/__pycache__/tessDiffImage.cpython-38.pyc
+code/__pycache__/tessDiffImage.cpython-39.pyc
+code/__pycache__/tessDiffImage.cpython-38.pyc
+example/.ipynb_checkpoints/example_diagnosticplot-checkpoint.ipynb
+example/.ipynb_checkpoints/example_diffimages-checkpoint.ipynb
+example/tic25375553/imageData_TOI_143.01_sector28.pickle
+example/tic25375553/ticKey_tic25375553.txt

@@ -216,13 +216,13 @@ def plot_report(star, planet, imageData):
     axHalf.set_xlabel('Hours from Secondary (Phase 0.50)',fontsize=fs)
     # Difference Images
     tdi = tessDiffImage.tessDiffImage(star,spiceFileLocation = "..")
-    tdi.draw_pix_catalog(imageData[0]['diffSNRImage'], imageData[1], ax=axDiff1, filterStars=True, dMagThreshold=4, fs=fs, ss=10)
+    tdi.draw_pix_catalog(imageData[0]['diffSNRImage'], imageData[1], imageData[1]["extent"], ax=axDiff1, filterStars=True, dMagThreshold=4, fs=fs, ss=10)
     axDiff1.set_title('Diff Image SNR', fontsize=fs)
-    tdi.draw_pix_catalog(imageData[0]['diffSNRImage'], imageData[1], ax=axDiff2, close=True, filterStars=True, dMagThreshold=4, fs=fs, ss=40)
+    tdi.draw_pix_catalog(imageData[0]['diffSNRImage'], imageData[1], imageData[1]["extentClose"], ax=axDiff2, close=True, filterStars=True, dMagThreshold=4, fs=fs, ss=40)
     axDiff2.set_title('Diff Image SNR (Close)', fontsize=fs)
-    tdi.draw_pix_catalog(imageData[0]['meanOutTransit'], imageData[1], ax=axDir1, filterStars=True, dMagThreshold=4, fs=fs, ss=10)
+    tdi.draw_pix_catalog(imageData[0]['meanOutTransit'], imageData[1], imageData[1]["extent"], ax=axDir1, filterStars=True, dMagThreshold=4, fs=fs, ss=10)
     axDir1.set_title('Direct Image', fontsize=fs)
-    tdi.draw_pix_catalog(imageData[0]['meanOutTransit'], imageData[1], ax=axDir2, close=True, filterStars=True, dMagThreshold=4, fs=fs, ss=40)
+    tdi.draw_pix_catalog(imageData[0]['meanOutTransit'], imageData[1], imageData[1]["extentClose"], ax=axDir2, close=True, filterStars=True, dMagThreshold=4, fs=fs, ss=40)
     axDir2.set_title('Direct Image (Close)', fontsize=fs)
     # Text
     plot_text(axText, star, planet, 0.15, 0.035, 0.95, 8)
