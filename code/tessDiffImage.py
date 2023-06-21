@@ -43,6 +43,7 @@ class tessDiffImage:
             dMagThreshold = 4,
             allowedBadCadences = 0,
             allowedInTransitLossFraction = 0.8,
+            maxOrbits = 116,
             cleanFiles = True,
             outputDir = "./",
             qlpFlagsLocation = None):
@@ -53,6 +54,7 @@ class tessDiffImage:
         self.dMagThreshold = dMagThreshold
         self.allowedBadCadences = allowedBadCadences
         self.allowedInTransitLossFraction = allowedInTransitLossFraction
+        self.maxOrbits = maxOrbits
         self.ticName = "tic" + str(self.ticData["id"])
         self.sectorList = []
         self.outputDir = outputDir
