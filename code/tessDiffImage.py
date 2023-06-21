@@ -92,7 +92,7 @@ class tessDiffImage:
                 print("not on specified camera or sector")
                 continue
 
-            if qlpFlagsLocation is not None:
+            if self.qlpFlagsLocation is not None:
                 sectorQflags = np.array([])
                 # Get QLP quality flags
                 orbit1, orbit2 = pixelData["sector"]*2+7, pixelData["sector"]*2+8
