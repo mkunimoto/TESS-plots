@@ -29,6 +29,12 @@ def get_tic(ra, dec, radiusDegrees):
     c = SkyCoord(ra, dec, unit=('deg', 'deg'), frame='icrs')
     return Catalogs.query_region(c, radius=radiusDegrees, catalog="TIC")
 
+def add_quality_flags(pixelData, cadence, quality):
+    qlpInCadences = np.isin(cadence, pixelData["cadenceNumber"])
+    gotQlpFlag = np.isin(pixelData["cadenceNumber"], cadence[qlpInCadences])
+    pixelData["quality"][gotQlpFlag] = pixelData["quality"][gotQlpFlag] + quality[qlpInCadences]
+    return pixelData
+
 class tessDiffImage:
     def __init__(self,
             ticData,
@@ -36,15 +42,17 @@ class tessDiffImage:
             nPixOnSide = 21,
             dMagThreshold = 4,
             allowedBadCadences = 0,
+            allowedInTransitLossFraction = 0.8,
             cleanFiles = True,
             outputDir = "./",
-            qlpFlagsLocation = "../tessRobovetter/lightcurves/QLP_qflags/"):
+            qlpFlagsLocation = None):
             
         self.ticData = ticData
         self.spiceFileLocation = spiceFileLocation
         self.nPixOnSide = nPixOnSide
         self.dMagThreshold = dMagThreshold
         self.allowedBadCadences = allowedBadCadences
+        self.allowedInTransitLossFraction = allowedInTransitLossFraction
         self.ticName = "tic" + str(self.ticData["id"])
         self.sectorList = []
         self.outputDir = outputDir
@@ -72,7 +80,7 @@ class tessDiffImage:
             return
         
         # we need to make the difference images
-        if allowedBadCadences == None:
+        if allowedBadCadences is None:
             allowedBadCadences = self.allowedBadCadences
             
         fitsList = self.get_tess_cut()
@@ -80,41 +88,47 @@ class tessDiffImage:
             print(fitsFile)
             pixelData = self.get_cadence_data(fitsFile)
             # check that this is the camera and sector that we want here
-            if (self.ticData["cam"] != None) & (self.ticData["sector"] != None) & ((self.ticData["sector"] != pixelData["sector"]) | (self.ticData["cam"] != pixelData["camera"])):
+            if (self.ticData["cam"] is not None) & (self.ticData["sector"] is not None) & ((self.ticData["sector"] != pixelData["sector"]) | (self.ticData["cam"] != pixelData["camera"])):
                 print("not on specified camera or sector")
                 continue
 
-            sectorQflags = np.array([])
-            # Get QLP quality flags
-            orbit1, orbit2 = pixelData["sector"]*2+7, pixelData["sector"]*2+8
-            if orbit1 <= 116:
-                cam = pixelData["camera"]
-                ccd = pixelData["ccd"]
-                orb1File = f"orbit{orbit1}/orbit{orbit1}cam{cam}ccd{ccd}_qflag.txt"
-                orb2File = f"orbit{orbit2}/orbit{orbit2}cam{cam}ccd{ccd}_qflag.txt"
-#                print(orb1File)
-#                print(orb2File)
-                sectorQflags = np.loadtxt(self.qlpFlagsLocation + orb1File)
-#                print(sectorQflags.shape)
-                sectorQflags = np.concatenate((sectorQflags, np.loadtxt(self.qlpFlagsLocation + orb2File))).astype(int)
-#                print(sectorQflags.shape)
+            if qlpFlagsLocation is not None:
+                sectorQflags = np.array([])
+                # Get QLP quality flags
+                orbit1, orbit2 = pixelData["sector"]*2+7, pixelData["sector"]*2+8
+                if orbit1 <= self.maxOrbits:
+                    cam = pixelData["camera"]
+                    ccd = pixelData["ccd"]
+                    orb1File = f"orbit{orbit1}/orbit{orbit1}cam{cam}ccd{ccd}_qflag.txt"
+                    orb2File = f"orbit{orbit2}/orbit{orbit2}cam{cam}ccd{ccd}_qflag.txt"
+    #                print(orb1File)
+    #                print(orb2File)
+                    sectorQflags = np.loadtxt(self.qlpFlagsLocation + orb1File)
+    #                print(sectorQflags.shape)
+                    sectorQflags = np.concatenate((sectorQflags, np.loadtxt(self.qlpFlagsLocation + orb2File))).astype(int)
+    #                print(sectorQflags.shape)
 
-                tsc_cad, tsc_flag = pixelData["cadenceNumber"], pixelData["quality"]
-                qlp_cad = sectorQflags[:,0]
-                qlp_flag = sectorQflags[:,1]
-#                print("len(qlp_flag) = " + str(len(qlp_flag)))
-                qlpInCadences = np.isin(qlp_cad, tsc_cad)
-                gotQlpFlag = np.isin(tsc_cad, qlp_cad[qlpInCadences])
-#                print("sum(gotQlpFlag) = " + str(sum(gotQlpFlag)) + " of " + str(len(gotQlpFlag)))
-                pixelData["quality"][gotQlpFlag] = pixelData["quality"][gotQlpFlag] + qlp_flag[qlpInCadences]
+                    qlp_cad = sectorQflags[:,0]
+                    qlp_flag = sectorQflags[:,1]
+    #                print("len(qlp_flag) = " + str(len(qlp_flag)))
+    #                qlpInCadences = np.isin(qlp_cad, tsc_cad)
+    #                gotQlpFlag = np.isin(tsc_cad, qlp_cad[qlpInCadences])
+    #                print("sum(gotQlpFlag) = " + str(sum(gotQlpFlag)) + " of " + str(len(gotQlpFlag)))
+    #                pixelData["quality"][gotQlpFlag] = pixelData["quality"][gotQlpFlag] + qlp_flag[qlpInCadences]
+                    pixelData = add_quality_flags(pixelData, qlp_cad, qlp_flag)
 
 
-#            if self.ticData["qualityFiles"] != None:
+            if self.ticData["qualityFlags"] is not None:
+                # self.ticData["qualityFlags"] has form [cadence list, quality list]
+                pixelData = add_quality_flags(pixelData, self.ticData["qualityFlags"][0], self.ticData["qualityFlags"][1])
+
+
+#            if self.ticData["qualityFiles"] is not None:
 #                for sectorList in self.ticData["qualityFiles"]:
 #                    if sectorList[0] == pixelData["sector"]:
 #                        for fname in sectorList[1]:
 #                            sectorQflags = np.append(sectorQflags, np.loadtxt(fname, usecols=(1)))
-#            elif self.ticData["qualityFlags"] != None:
+#            elif self.ticData["qualityFlags"] is not None:
 #                for sectorList in self.ticData["qualityFlags"]:
 #                    if sectorList[0] == pixelData["sector"]:
 #                        sectorQflags = sectorList[1]
@@ -130,7 +144,7 @@ class tessDiffImage:
             if len(catalogData) == 0:
                 continue
             
-            if thisPlanet == None:
+            if thisPlanet is None:
                 for p, planetData in enumerate(self.ticData["planetData"]):
                     planetData["planetIndex"] = p
                     planetData["planetID"] = p
@@ -149,7 +163,7 @@ class tessDiffImage:
             os.system('rm ' + self.outputDir + self.ticName + '/*.fits')
 
     def make_planet_difference_image(self, planetData, pixelData, catalogData, allowedBadCadences = None, drawImages = False):
-        if allowedBadCadences == None:
+        if allowedBadCadences is None:
             allowedBadCadences = self.allowedBadCadences
             
         # for each planet, make an array of cadences that are in the transits of other planets
@@ -196,7 +210,7 @@ class tessDiffImage:
         ticName = self.ticName
         zipStr = self.outputDir + ticName + '.zip'
         if not os.path.exists(zipStr):
-            if sector == None:
+            if sector is None:
                 curlStr = 'curl "https://mast.stsci.edu/tesscut/api/v0.1/astrocut?ra=' \
                             + str(ra) + '&dec=' + str(dec) + '&y=' + str(self.nPixOnSide) + '&x=' + str(self.nPixOnSide) \
                             + '" --output ' + zipStr
@@ -246,17 +260,19 @@ class tessDiffImage:
         cadence0 = priHeader["FFIINDEX"]
         t0 = image_jd[0]
 
-        if (image_jd[1] - image_jd[0]) > 0.01:
-            # 30 min cadence
-            dt = 48
-        elif (image_jd[1] - image_jd[0]) > 0.005:
-            # 10 min cadence
-            dt = 24*6
-        else:
-            # 2 min cadence
-            dt = 24*30
+        dt = np.nanmedian(np.diff(image_jd))
+        
+#        if (image_jd[1] - image_jd[0]) > 0.01:
+#            # 30 min cadence
+#            dt = 48
+#        elif (image_jd[1] - image_jd[0]) > 0.005:
+#            # 10 min cadence
+#            dt = 24*6
+#        else:
+#            # 2 min cadence
+#            dt = 24*30
 
-        pixelData["cadenceNumber"] = cadence0 + np.round((image_jd - t0)*dt).astype(int)
+        pixelData["cadenceNumber"] = cadence0 + np.round((image_jd - t0)/dt).astype(int)
 
         # perform the barycentric correction
         # Tess cut time is barycentric correccted to the center of the source FFI
@@ -289,7 +305,7 @@ class tessDiffImage:
         return transitTimes, transitIndex
 
     def find_transits(self, pixelData, planetData, allowedBadCadences = None):
-        if allowedBadCadences == None:
+        if allowedBadCadences is None:
             allowedBadCadences = self.allowedBadCadences
             
         transitTimes, transitIndex = self.find_transit_times(pixelData, planetData)
@@ -306,7 +322,7 @@ class tessDiffImage:
     #    print("durationDays = " + str(durationDays))
     #    print("outTransitBuffer = " + str(outTransitBuffer))
     #    print("transitAverageDurationDays = " + str(transitAverageDurationDays))
-        expectedInTransitLength = np.floor(2*transitAverageDurationDays/dt) - 4
+        expectedInTransitLength = np.floor(2*transitAverageDurationDays/dt)
 #        print("expected number in transit = ", str(expectedInTransitLength))
         inTransitIndices = []
         outTransitIndices = []
@@ -322,14 +338,15 @@ class tessDiffImage:
             thisTransitBadCadences = np.sum(pixelData["quality"][thisTransitInIndices] != 0) + np.sum(pixelData["quality"][thisTransitOutIndices] != 0)
 
             # check if we have indices covering the transits
-            if len(thisTransitInIndices) < expectedInTransitLength:
-                print("not enough in transit indices: " + str([len(thisTransitInIndices), expectedInTransitLength]))
-                print("adding " + str(expectedInTransitLength - len(thisTransitInIndices)) + " to thisTransitBadCadences")
-                thisTransitBadCadences += expectedInTransitLength - len(thisTransitInIndices)
-            if len(thisTransitOutIndices) < 2*expectedInTransitLength:
-                print("not enough out transit indices: " + str([len(thisTransitOutIndices), 2*expectedInTransitLength]))
-                print("adding " + str(2*expectedInTransitLength - len(thisTransitOutIndices)) + " to thisTransitBadCadences")
-                thisTransitBadCadences += 2*expectedInTransitLength - len(thisTransitOutIndices)
+            acceptableTransitLength = np.floor(self.allowedInTransitLossFraction*expectedInTransitLength)
+            if len(thisTransitInIndices) < acceptableTransitLength:
+                print("not enough in transit indices: " + str([len(thisTransitInIndices), acceptableTransitLength]))
+                print("adding " + str(acceptableTransitLength - len(thisTransitInIndices)) + " to thisTransitBadCadences")
+                thisTransitBadCadences += acceptableTransitLength - len(thisTransitInIndices)
+            if len(thisTransitOutIndices) < 2*acceptableTransitLength:
+                print("not enough out transit indices: " + str([len(thisTransitOutIndices), 2*acceptableTransitLength]))
+                print("adding " + str(2*acceptableTransitLength - len(thisTransitOutIndices)) + " to thisTransitBadCadences")
+                thisTransitBadCadences += 2*acceptableTransitLength - len(thisTransitOutIndices)
 
     #        print(sum(pixelData["quality"][thisTransitInIndices] > 0) + sum(pixelData["quality"][thisTransitOutIndices] > 0))
     #        print("transit " + str(i) + ":")
@@ -551,11 +568,11 @@ class tessDiffImage:
     
         dCol = catalogData["dCol"]
         dRow = catalogData["dRow"]
-        if dMagThreshold == None:
+        if dMagThreshold is None:
             dMagThreshold = self.dMagThreshold
-        if ax == None:
+        if ax is None:
             ax = plt.gca()
-        if targetID == None:
+        if targetID is None:
             targetIndex = 0
         else:
             targetIndex = ((ticCatalog["ID"]).astype(int)==targetID)[0]
@@ -614,7 +631,7 @@ class tessDiffImage:
         ax.set_ylim(extent[2], extent[3])
 
     def draw_difference_image(self, diffImageData, pixelData, planetData, catalogData, dMagThreshold = None):
-        if dMagThreshold == None:
+        if dMagThreshold is None:
             dMagThreshold = self.dMagThreshold
 
         if planetData["badCadenceAlert"]:
