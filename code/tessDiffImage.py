@@ -116,6 +116,8 @@ class tessDiffImage:
     #                print("sum(gotQlpFlag) = " + str(sum(gotQlpFlag)) + " of " + str(len(gotQlpFlag)))
     #                pixelData["quality"][gotQlpFlag] = pixelData["quality"][gotQlpFlag] + qlp_flag[qlpInCadences]
                     pixelData = add_quality_flags(pixelData, qlp_cad, qlp_flag)
+                else:
+                    print("No QLP quality flags for orbit " + str(orbit1))
 
 
             if self.ticData["qualityFlags"] is not None:
@@ -137,8 +139,6 @@ class tessDiffImage:
 #                pixelData["quality"] = pixelData["quality"] + sectorQflags
 #            else:
 #                print("no sector quality flags of the same length as FFI quality flags")
-            else:
-                print("No QLP quality flags for orbit " + str(orbit1))
 
             catalogData = self.make_stellar_scene(pixelData)
             if len(catalogData) == 0:
