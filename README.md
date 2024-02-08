@@ -4,6 +4,8 @@ This package includes two tools useful for assessing the candidacy of planet can
 
 ## 1. Difference images
 
+### No longer maintained - Please see [transit-diffImage](https://github.com/stevepur/transit-diffImage) for TESS difference image generation ###
+
 A common source of false positives in transit surveys is signals that originate from stars nearby or in the background of the target. Light from these contaminant stars contributes to the lightcurve, so a deep eclipse around a nearby star can appear like a planet transit around the target. Since TESS pixels are large (21"x21"), this is especially important to consider when assessing the candidacy of TESS planet candidates.
 
 This tool takes in basic information about the target star (TIC ID, RA, Dec) and the potential planet (period, epoch, duration), uses TESScut to create a cutout of the FFIs centred on the target, identifies in- and out-of-transit cadences, and computes and plots difference images. See `example/example_diffimages.ipynb` for an example use of this tool.
