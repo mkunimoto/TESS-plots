@@ -213,11 +213,11 @@ class tessDiffImage:
         zipStr = self.outputDir + ticName + '.zip'
         if not os.path.exists(zipStr):
             if sector is None:
-                curlStr = 'curl "https://mast.stsci.edu/tesscut/api/v0.1/astrocut?ra=' \
+                curlStr = 'curl -L "https://mast.stsci.edu/tesscut/api/v0.1/astrocut?ra=' \
                             + str(ra) + '&dec=' + str(dec) + '&y=' + str(self.nPixOnSide) + '&x=' + str(self.nPixOnSide) \
                             + '" --output ' + zipStr
             else:
-                curlStr = 'curl "https://mast.stsci.edu/tesscut/api/v0.1/astrocut?ra=' \
+                curlStr = 'curl -L "https://mast.stsci.edu/tesscut/api/v0.1/astrocut?ra=' \
                             + str(ra) + '&dec=' + str(dec) + '&y=' + str(self.nPixOnSide) + '&x=' + str(self.nPixOnSide) + '&sector=' + str(sector) \
                             + '" --output ' + zipStr
             print(curlStr)
